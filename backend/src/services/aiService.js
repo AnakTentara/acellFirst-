@@ -2,19 +2,40 @@ import { parseReceiptEmail } from '../parsers/receiptParser.js';
 import { config } from '../config.js';
 
 // Coordinates for major Indonesian courier hubs & delivery centers
-const CITY_COORDINATES = {
+export const CITY_COORDINATES = {
   'jakarta': { lat: -6.2088, lng: 106.8456, name: 'Jakarta (Hub Logistik Pusat)' },
   'jakarta barat': { lat: -6.1683, lng: 106.7588, name: 'Jakarta Barat (Sorting Center)' },
+  'jakarta selatan': { lat: -6.2615, lng: 106.8106, name: 'Jakarta Selatan' },
   'jakarta timur': { lat: -6.2250, lng: 106.9004, name: 'Jakarta Timur (DC Cakung)' },
+  'jakarta utara': { lat: -6.1214, lng: 106.7741, name: 'Jakarta Utara' },
+  'jakarta pusat': { lat: -6.1805, lng: 106.8284, name: 'Jakarta Pusat' },
   'tangerang': { lat: -6.1783, lng: 106.6319, name: 'Tangerang (Warehouse SPX/J&T)' },
+  'tangerang selatan': { lat: -6.2889, lng: 106.7179, name: 'Tangerang Selatan (BSD)' },
   'bekasi': { lat: -6.2383, lng: 106.9756, name: 'Bekasi (Transit Hub)' },
   'bogor': { lat: -6.5971, lng: 106.8060, name: 'Bogor (Gateway)' },
   'bandung': { lat: -6.9175, lng: 107.6191, name: 'Bandung (Alamat Acell & Haikal)' },
   'surabaya': { lat: -7.2575, lng: 112.7521, name: 'Surabaya (Hub Timur)' },
   'semarang': { lat: -6.9667, lng: 110.4167, name: 'Semarang (Central Hub)' },
   'yogyakarta': { lat: -7.7956, lng: 110.3695, name: 'Yogyakarta (Gateway)' },
-  'medan': { lat: 3.5952, lng: 98.6722, name: 'Medan (Sumatera Hub)' }
+  'solo': { lat: -7.5755, lng: 110.8243, name: 'Solo / Surakarta' },
+  'malang': { lat: -7.9666, lng: 112.6326, name: 'Malang' },
+  'denpasar': { lat: -8.6705, lng: 115.2126, name: 'Denpasar Bali' },
+  'bali': { lat: -8.6705, lng: 115.2126, name: 'Denpasar Bali' },
+  'medan': { lat: 3.5952, lng: 98.6722, name: 'Medan (Sumatera Hub)' },
+  'palembang': { lat: -2.9761, lng: 104.7754, name: 'Palembang' },
+  'makassar': { lat: -5.1477, lng: 119.4327, name: 'Makassar' }
 };
+
+export function getCityCoordinates(cityName) {
+  if (!cityName) return { lat: -6.9175, lng: 107.6191, name: 'Bandung (Sanctuary)' };
+  const key = cityName.toLowerCase().trim();
+  for (const [k, v] of Object.entries(CITY_COORDINATES)) {
+    if (key.includes(k) || k.includes(key)) {
+      return v;
+    }
+  }
+  return { lat: -6.9175, lng: 107.6191, name: `${cityName} (Sanctuary Destination)` };
+}
 
 /**
  * Call OhhMyAgent / OpenAI API to analyze incoming email
