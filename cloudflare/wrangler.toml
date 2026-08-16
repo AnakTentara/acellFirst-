@@ -3,5 +3,5 @@ main = "worker.js"
 compatibility_date = "2024-01-01"
 
 [vars]
-WEBHOOK_URL = "https://acellimut.haikaldev.my.id/api/mail/inbound"
+WEBHOOK_URL = "https://acellimut.my.id/api/mail/inbound"
 WEBHOOK_SECRET = "Senin23062025"

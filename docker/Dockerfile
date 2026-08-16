@@ -14,7 +14,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=4000
+ENV PORT=23625
 
 COPY backend/package*.json ./backend/
 RUN cd backend && npm install --omit=dev
@@ -25,6 +25,6 @@ COPY --from=builder /app/frontend/dist ./frontend/dist
 # SQLite Data Volume
 VOLUME ["/app/backend/data"]
 
-EXPOSE 4000
+EXPOSE 23625
 
 CMD ["node", "backend/src/server.js"]

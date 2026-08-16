@@ -179,22 +179,14 @@ export default function SettingsModal({
 
           {/* Quick preset buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pilihan Cepat:</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pilihan Domain:</span>
             <button
               type="button"
-              onClick={() => handlePresetSwitch('acellimut.haikaldev.my.id')}
+              onClick={() => handlePresetSwitch('acellimut.my.id')}
               className="glass-pill"
-              style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+              style={{ fontSize: '0.72rem', padding: '3px 8px', background: '#fff0f5', color: '#ff5c8a', borderColor: '#ffd1dc' }}
             >
-              🛠️ Staging: acellimut.haikaldev.my.id
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePresetSwitch('acellimut.net')}
-              className="glass-pill"
-              style={{ fontSize: '0.72rem', padding: '3px 8px' }}
-            >
-              💎 Utama: acellimut.net
+              💖 acellimut.my.id (Utama)
             </button>
           </div>
         </form>

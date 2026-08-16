@@ -8,11 +8,11 @@ services:
     container_name: acel-haikal-sanctuary
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "23625:23625"
     environment:
-      - PORT=4000
+      - PORT=23625
       - NODE_ENV=production
-      - ACTIVE_DOMAIN=acellimut.haikaldev.my.id
+      - ACTIVE_DOMAIN=acellimut.my.id
       - WEBHOOK_SECRET=couple_secret_token_123
     volumes:
       - sanctuary_data:/app/backend/data

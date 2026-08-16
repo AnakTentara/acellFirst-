@@ -7,7 +7,7 @@
 
 export default {
   async email(message, env, ctx) {
-    const webhookUrl = env.WEBHOOK_URL || "https://acellimut.haikaldev.my.id/api/mail/inbound";
+    const webhookUrl = env.WEBHOOK_URL || "https://acellimut.my.id/api/mail/inbound";
     const webhookSecret = env.WEBHOOK_SECRET || "Senin23062025";
 
     try {

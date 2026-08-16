@@ -4,13 +4,13 @@
 #   💑 ACEL & HAIKAL SANCTUARY - PTERODACTYL RUN SCRIPT
 # ========================================================
 
-echo "✨ Memulai Acel & Haikal Sanctuary Couple Ecosystem..."
+echo "✨ Memulai Acell & Haikal Sanctuary Couple Ecosystem..."
 
-# 1. Gunakan port yang dialokasikan oleh Pterodactyl jika ada
+# 1. Gunakan port unik 23625 (23-06-25 Anniversary) atau port Pterodactyl
 if [ -n "$SERVER_PORT" ]; then
   export PORT=$SERVER_PORT
 elif [ -z "$PORT" ]; then
-  export PORT=4000
+  export PORT=23625
 fi
 
 # 2. Cek file .env
@@ -28,9 +28,9 @@ GIRL_NAME=Acell
 GIRL_NICKNAME=My Girl 💖
 ANNIVERSARY_DATE=2025-06-23
 
-ACTIVE_DOMAIN=acellimut.haikaldev.my.id
-STAGING_DOMAIN=acellimut.haikaldev.my.id
-PRIMARY_DOMAIN=acellimut.net
+ACTIVE_DOMAIN=acellimut.my.id
+STAGING_DOMAIN=acellimut.my.id
+PRIMARY_DOMAIN=acellimut.my.id
 EOT
 fi
 

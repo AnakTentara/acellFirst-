@@ -10,7 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 export const config = {
-  port: parseInt(process.env.PORT || '3000', 10),
+  port: parseInt(process.env.PORT || '23625', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   jwtSecret: process.env.JWT_SECRET || 'Senin23062025',
   webhookSecret: process.env.WEBHOOK_SECRET || 'Senin23062025',
@@ -23,9 +23,9 @@ export const config = {
   anniversaryDate: process.env.ANNIVERSARY_DATE || '2025-06-23', // 23 Juni 2025
 
   // Dynamic Domain System
-  activeDomain: process.env.ACTIVE_DOMAIN || 'acellimut.haikaldev.my.id',
-  stagingDomain: process.env.STAGING_DOMAIN || 'acellimut.haikaldev.my.id',
-  primaryDomain: process.env.PRIMARY_DOMAIN || 'acellimut.net',
+  activeDomain: process.env.ACTIVE_DOMAIN || 'acellimut.my.id',
+  stagingDomain: process.env.STAGING_DOMAIN || 'acellimut.my.id',
+  primaryDomain: process.env.PRIMARY_DOMAIN || 'acellimut.my.id',
   
   // Custom Aliases
   allowedAliases: [

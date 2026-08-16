@@ -1,8 +1,7 @@
 class ApiConfig {
-  // Default staging endpoint (bisa diganti seketika dari menu Pengaturan di dalam App)
-  static String defaultBaseUrl = 'https://acellimut.haikaldev.my.id';
-  static String stagingDomain = 'acellimut.haikaldev.my.id';
-  static String primaryDomain = 'acellimut.net';
+  static String defaultBaseUrl = 'https://acellimut.my.id';
+  static String stagingDomain = 'acellimut.my.id';
+  static String primaryDomain = 'acellimut.my.id';
 
   static String baseUrl = defaultBaseUrl;
 

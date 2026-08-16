@@ -35,7 +35,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [daysTogether, setDaysTogether] = useState('...');
   const [systemConfig, setSystemConfig] = useState(null);
-  const [activeDomain, setActiveDomain] = useState('acellimut.haikaldev.my.id');
+  const [activeDomain, setActiveDomain] = useState('acellimut.my.id');
 
   const [emails, setEmails] = useState([]);
   const [selectedEmail, setSelectedEmail] = useState(null);
