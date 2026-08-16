@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node backend/src/server.js",
+    "build": "cd frontend && npm run build",
+    "dev": "node backend/src/server.js",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build:frontend": "cd frontend && npm run build"
