@@ -1,0 +1,22 @@
+{
+  "name": "acel-haikal-sanctuary",
+  "version": "1.0.0",
+  "description": "Acel & Haikal Sanctuary - Romantic Couple Ecosystem & Custom Webmail",
+  "main": "backend/src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node backend/src/server.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "couple-ecosystem",
+    "webmail",
+    "shopping-tracker",
+    "love-letters",
+    "receipt-parser"
+  ],
+  "author": "Haikal",
+  "license": "MIT"
+}

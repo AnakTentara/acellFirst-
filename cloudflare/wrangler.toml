@@ -1,0 +1,7 @@
+name = "acel-mail-router"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+WEBHOOK_URL = "https://acellimut.haikaldev.my.id/api/mail/inbound"
+WEBHOOK_SECRET = "couple_super_secret_key_change_me"

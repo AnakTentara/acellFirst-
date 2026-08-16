@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  sanctuary-app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: acel-haikal-sanctuary
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - ACTIVE_DOMAIN=acellimut.haikaldev.my.id
+      - WEBHOOK_SECRET=couple_secret_token_123
+    volumes:
+      - sanctuary_data:/app/backend/data
+
+volumes:
+  sanctuary_data:
