@@ -41,15 +41,14 @@ Cloudflare akan memberikan perintah instalasi sesuai OS:
 Di halaman konfigurasi Tunnel &rarr; Tab **Public Hostname** &rarr; Klik **Add a public hostname**:
 
 1. **Domain Configuration:**
-   * **Subdomain:** `acellimut`
-   * **Domain:** `haikaldev.my.id` (atau nanti saat ganti ke `acellimut.net`)
+   * **Domain:** `acellimut.my.id`
    * **Path:** *(kosongkan)*
 2. **Service Configuration:**
    * **Type:** `HTTP`
-   * **URL:** `localhost:4000` (atau `127.0.0.1:4000` / IP internal container kamu)
+   * **URL:** `localhost:23625` (atau `127.0.0.1:23625` / IP internal container kamu)
 3. Klik **Save Hostname**.
 
-Dalam beberapa detik, website `https://acellimut.haikaldev.my.id` sudah online dengan HTTPS aman!
+Dalam beberapa detik, website `https://acellimut.my.id` sudah online dengan HTTPS aman!
 
 ---
 

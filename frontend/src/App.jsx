@@ -287,7 +287,7 @@ export default function App() {
         daysTogether={daysTogether}
         activeDomain={activeDomain}
         onOpenSettings={() => setShowSettings(true)}
-        isLiveConnected={isLiveConnected}
+        onSimulateMail={handleSimulateMail}
         onRefresh={loadInitialData}
       />
 

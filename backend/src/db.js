@@ -15,7 +15,7 @@ if (!fs.existsSync(config.uploadsPath)) {
 let db = null;
 let isNodeSqlite = false;
 
-// 1. Initialize SQLite Database (Prioritizes built-in node:sqlite for 100% ARM64/Linux/Windows compatibility without C++ bindings)
+// 1. Initialize SQLite Database (Node 22 native built-in node:sqlite)
 async function getDbConnection() {
   if (db) return db;
 
@@ -23,10 +23,8 @@ async function getDbConnection() {
     const { DatabaseSync } = await import('node:sqlite');
     db = new DatabaseSync(config.dbPath);
     isNodeSqlite = true;
-    console.log('✅ Using Node.js native built-in SQLite (Zero C++ binding dependencies, ARM64 & Linux ready)');
     return db;
   } catch (err) {
-    console.log('ℹ️ Falling back to sqlite3 npm package...');
     try {
       const sqlite3Pkg = await import('sqlite3');
       const sqlite3 = sqlite3Pkg.default || sqlite3Pkg;
@@ -89,7 +87,7 @@ export const run = async (sql, params = []) => {
 export const initDatabase = async () => {
   await getDbConnection();
 
-  // Execute table creations
+  // 1. Users Table
   await run(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -106,6 +104,7 @@ export const initDatabase = async () => {
     )
   `);
 
+  // 2. Emails Table
   await run(`
     CREATE TABLE IF NOT EXISTS emails (
       id TEXT PRIMARY KEY,
@@ -133,6 +132,7 @@ export const initDatabase = async () => {
   try { await run(`ALTER TABLE emails ADD COLUMN is_outbound INTEGER DEFAULT 0`); } catch (e) {}
   try { await run(`ALTER TABLE emails ADD COLUMN is_draft INTEGER DEFAULT 0`); } catch (e) {}
 
+  // 3. Shopping Items Table
   await run(`
     CREATE TABLE IF NOT EXISTS shopping_items (
       id TEXT PRIMARY KEY,
@@ -154,6 +154,7 @@ export const initDatabase = async () => {
     )
   `);
 
+  // 4. Love Letters Table
   await run(`
     CREATE TABLE IF NOT EXISTS love_letters (
       id TEXT PRIMARY KEY,
@@ -162,7 +163,7 @@ export const initDatabase = async () => {
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       music_url TEXT,
-      theme_color TEXT DEFAULT '#ff6b9d',
+      theme_color TEXT DEFAULT '#2563eb',
       is_locked INTEGER DEFAULT 0,
       unlock_date DATETIME,
       is_opened INTEGER DEFAULT 0,
@@ -172,6 +173,7 @@ export const initDatabase = async () => {
     )
   `);
 
+  // 5. Wishlist Items Table
   await run(`
     CREATE TABLE IF NOT EXISTS wishlist_items (
       id TEXT PRIMARY KEY,
@@ -189,6 +191,7 @@ export const initDatabase = async () => {
     )
   `);
 
+  // 6. System Settings Table
   await run(`
     CREATE TABLE IF NOT EXISTS system_settings (
       key TEXT PRIMARY KEY,
@@ -196,6 +199,11 @@ export const initDatabase = async () => {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Automatic Migration: Scrub old domains and ensure active_domain = acellimut.my.id
+  await run(`UPDATE system_settings SET value = 'acellimut.my.id' WHERE key = 'active_domain'`);
+  await run(`UPDATE users SET display_name = 'Acell', username = 'acell' WHERE role = 'girl'`);
+  await run(`UPDATE users SET display_name = 'Haikal', username = 'haikal' WHERE role = 'boy'`);
 
   // Seed default users if not exists
   const boyUser = await getOne(`SELECT * FROM users WHERE username = ?`, ['haikal']);
@@ -212,7 +220,7 @@ export const initDatabase = async () => {
       'boy',
       'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
       pinHashHaikal,
-      '💖 Lagi kangen kamu'
+      '💙 Lagi kangen kamu'
     ]);
   }
 
@@ -226,18 +234,19 @@ export const initDatabase = async () => {
       'user_acell',
       'acell',
       config.girlName || 'Acell',
-      config.girlNickname || 'My Girl 💖',
+      config.girlNickname || 'My Girl 💙',
       'girl',
       'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
       pinHashAcell,
-      '✨ Semangat hari ini!'
+      '🌌 Semangat hari ini!'
     ]);
-  } else {
-    // Ensure display_name is updated to Acell
-    await run(`UPDATE users SET display_name = 'Acell', username = 'acell' WHERE role = 'girl'`);
   }
 
-  // Seed sample initial emails & receipts if database is fresh
+  // Clean obsolete dummy records from earlier iterations
+  await run(`DELETE FROM emails WHERE to_address LIKE '%haikaldev.my.id%' OR to_address LIKE '%acellimut.net%'`);
+  await run(`DELETE FROM shopping_items WHERE tracking_number = 'SPXID048192841' OR item_title LIKE '%Korean Aesthetic Thermal Tumbler%'`);
+
+  // Seed clean initial welcome mail if no emails exist
   const emailCount = await getOne(`SELECT COUNT(*) as count FROM emails`);
   if (emailCount && emailCount.count === 0) {
     const welcomeMailId = 'mail_welcome_001';
@@ -247,76 +256,35 @@ export const initDatabase = async () => {
     `, [
       welcomeMailId,
       'welcome_msg_001',
-      'system@sanctuary.acell',
+      'system@acellimut.my.id',
       'Acell & Haikal Sanctuary',
-      `love@${config.activeDomain}`,
-      'love',
-      'Selamat Datang di Rumah Digital Kita Berdua! 💖✨',
-      'Halo Acell & Haikal! Ini adalah email pertama di ekosistem privat kita. Semua email belanja, surat rahasia, dan momen indah kita tersimpan aman di sini.',
-      `<div style="font-family: sans-serif; padding: 24px; color: #333; line-height: 1.6;">
-        <h2 style="color: #ff5c8a;">Selamat Datang di Rumah Digital Kita Berdua! 💖</h2>
+      `us@acellimut.my.id`,
+      'us',
+      'Selamat Datang di Rumah Digital Acell & Haikal 🌌💙',
+      'Halo Acell & Haikal! Selamat datang di ekosistem privat kita. Semua email belanja (Shopee, Tokopedia, TikTok Shop), surat rahasia, dan momen indah kita tersimpan aman di sini.',
+      `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 28px; background: #ffffff; color: #0f172a; line-height: 1.6; border-radius: 16px; border: 1px solid #dbeafe;">
+        <div style="background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%); padding: 20px; border-radius: 12px; color: #fff; text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px;">🌌 Acell & Haikal Sanctuary</h2>
+          <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">acellimut.my.id • Private Couple Ecosystem</p>
+        </div>
         <p>Hai <b>Acell</b> & <b>Haikal</b>,</p>
-        <p>Sekarang kita sudah punya email privat sendiri untuk belanja bareng di Shopee, Tokopedia, TikTok Shop, dan kirim surat cinta tanpa gangguan siapa pun!</p>
-        <div style="background: #fff0f5; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #ffd1dc;">
-          <p style="margin: 0; color: #d63384; font-weight: bold;">✨ Alamat Email Kita yang Bisa Dipakai:</p>
-          <ul style="margin-top: 8px; margin-bottom: 0;">
-            <li><code>shopping@${config.activeDomain}</code> (Khusus Belanja & Resi Paket)</li>
-            <li><code>love@${config.activeDomain}</code> (Surat Cinta & Kejutan)</li>
-            <li><code>acell@${config.activeDomain}</code> (Khusus Acell Cantik)</li>
-            <li><code>haikal@${config.activeDomain}</code> (Khusus Haikal)</li>
+        <p>Sekarang kita sudah punya email privat resmi dengan domain <b>acellimut.my.id</b> untuk belanja bersama dan berbagi momen romantis!</p>
+        <div style="background: #eff6ff; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #bfdbfe;">
+          <p style="margin: 0; color: #1e40af; font-weight: 700; font-size: 14px;">📬 Alamat Email Aktif Kita:</p>
+          <ul style="margin-top: 8px; margin-bottom: 0; padding-left: 20px; font-size: 13px; color: #1e293b;">
+            <li><code>us@acellimut.my.id</code> — Email bersama & Couple Inbox</li>
+            <li><code>shopping@acellimut.my.id</code> — Khusus belanja (Shopee, Tokped, TikTok Shop)</li>
+            <li><code>etall@acellimut.my.id</code> — Layanan & Tagihan bersama</li>
+            <li><code>acell@acellimut.my.id</code> — Email pribadi Acell</li>
+            <li><code>haikal@acellimut.my.id</code> — Email pribadi Haikal</li>
           </ul>
         </div>
-        <p>I love you to the moon and back! 🌙✨</p>
+        <p style="font-size: 14px; color: #475569;">I love you to the stars and back! 🌌✨</p>
       </div>`,
       'love'
     ]);
 
-    // Sample Shopee Receipt
-    const shopeeMailId = 'mail_shopee_002';
-    await run(`
-      INSERT INTO emails (id, message_id, from_address, from_name, to_address, alias_name, subject, text_body, html_body, category, is_read_by_boy, is_read_by_girl, is_starred)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 1)
-    `, [
-      shopeeMailId,
-      'shopee_order_9981',
-      'order@shopee.co.id',
-      'Shopee Indonesia',
-      `shopping@${config.activeDomain}`,
-      'shopping',
-      'Pesanan #260816SHP Telah Dikirim! [Skincare & Cute Tumbler]',
-      'Pesanan Shopee Anda #260816SHP dengan kurir SPX Express (SPXID048192841) sedang dalam perjalanan menuju alamat tujuan.',
-      `<div style="font-family: sans-serif; padding: 20px; background: #fff;">
-        <h3 style="color: #ee4d2d;">Pesanan Shopee Anda Sedang Dikirim! 🚚</h3>
-        <p>Halo Acell! Paket belanjaanmu sedang dalam perjalanan.</p>
-        <p><b>Nomor Pesanan:</b> #260816SHP<br/><b>Kurir:</b> SPX Express Standard<br/><b>Nomor Resi:</b> SPXID048192841</p>
-        <p><b>Produk:</b> Korean Aesthetic Thermal Tumbler (Pink Pastel) + Skincare Glow Set</p>
-        <p><b>Total Pembayaran:</b> Rp 245.000 (Lunas)</p>
-      </div>`,
-      'shopping'
-    ]);
-
-    // Insert shopping item record
-    await run(`
-      INSERT INTO shopping_items (id, email_id, platform, order_id, tracking_number, courier, item_title, item_image, total_price, currency, status, estimated_delivery, notes, buyer_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      'shop_item_001',
-      shopeeMailId,
-      'Shopee',
-      '#260816SHP',
-      'SPXID048192841',
-      'SPX Express',
-      'Korean Aesthetic Thermal Tumbler (Pink Pastel) + Skincare Set',
-      'https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop&q=80',
-      245000,
-      'IDR',
-      'shipping',
-      'Besok Sore (Estimasi 17 Ags)',
-      'Kado lucu buat Acell biar rajin minum air ✨',
-      'Acell & Haikal'
-    ]);
-
-    // Sample Love Letter
+    // Initial Love Letter
     await run(`
       INSERT INTO love_letters (id, author_id, recipient_id, title, content, music_url, theme_color, is_locked, unlock_date, is_opened)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -324,32 +292,15 @@ export const initDatabase = async () => {
       'letter_001',
       'user_haikal',
       'user_acell',
-      'Untuk Pacar Cantikku, Acell 🌸',
-      'Hai sayang! Makasih ya udah selalu ada dan bikin hari-hariku jauh lebih cerah dan bahagia. Web & ekosistem ini kubuat khusus buat kita berdua biar kita punya tempat privat yang aesthetic. Semoga kamu suka ya! Love you so much 💖',
+      'Untuk Pacar Cantikku, Acell 🌌💙',
+      'Hai sayang! Makasih ya udah selalu ada dan bikin hari-hariku jauh lebih cerah dan bahagia. Web & ekosistem ini kubuat khusus buat kita berdua biar kita punya tempat privat yang aesthetic. Semoga kamu suka ya! Love you so much 💙',
       'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
-      '#ff6b9d',
+      '#2563eb',
       0,
       null,
       0
     ]);
-
-    // Sample Wishlist
-    await run(`
-      INSERT INTO wishlist_items (id, title, price, url, image_url, category, priority, added_by, is_bought, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      'wish_001',
-      'Instax Mini LiPlay Hybrid Camera (Blush Pink)',
-      2199000,
-      'https://shopee.co.id',
-      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=300&auto=format&fit=crop&q=80',
-      'Gadget & Hobi',
-      'high',
-      'user_acell',
-      0,
-      'Biar bisa cetak foto-foto date kita langsung! 📸'
-    ]);
   }
 
-  console.log('✅ Database tables and seed data initialized successfully!');
+  console.log('✅ Database initialized and synced with acellimut.my.id!');
 };
