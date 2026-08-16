@@ -16,11 +16,11 @@ export default function ComposeMailModal({
   const [isSending, setIsSending] = useState(false);
 
   const aliases = [
+    { id: 'us', label: `us@${activeDomain}`, desc: 'Email Kita Berdua / Couple' },
     { id: 'shopping', label: `shopping@${activeDomain}`, desc: 'Khusus Belanja & Resi' },
-    { id: 'love', label: `love@${activeDomain}`, desc: 'Surat Romantis & Kejutan' },
-    { id: 'acel', label: `acel@${activeDomain}`, desc: 'Email Pribadi Acel' },
-    { id: 'haikal', label: `haikal@${activeDomain}`, desc: 'Email Pribadi Haikal' },
-    { id: 'secret', label: `secret@${activeDomain}`, desc: 'Pesan Rahasia' }
+    { id: 'etall', label: `etall@${activeDomain}`, desc: 'Belanja & Layanan Bersama' },
+    { id: 'acell', label: `acell@${activeDomain}`, desc: 'Email Pribadi Acell' },
+    { id: 'haikal', label: `haikal@${activeDomain}`, desc: 'Email Pribadi Haikal' }
   ];
 
   const presets = [

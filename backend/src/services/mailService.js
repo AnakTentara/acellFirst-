@@ -68,11 +68,11 @@ export async function processInboundEmail(payload) {
 
   // Determine category
   let category = 'general';
-  if (aliasName === 'shopping' || aliasName === 'order' || aliasName === 'receipts' || aliasName === 'bills') {
+  if (aliasName === 'shopping' || aliasName === 'etall' || aliasName === 'order' || aliasName === 'receipts' || aliasName === 'bills') {
     category = 'shopping';
-  } else if (aliasName === 'love' || aliasName === 'surat' || aliasName === 'secret') {
+  } else if (aliasName === 'us' || aliasName === 'love' || aliasName === 'surat' || aliasName === 'secret') {
     category = 'love';
-  } else if (aliasName === 'acel' || aliasName === 'haikal') {
+  } else if (aliasName === 'acell' || aliasName === 'acel' || aliasName === 'haikal') {
     category = 'personal';
   }
 

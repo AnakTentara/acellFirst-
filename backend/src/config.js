@@ -29,10 +29,12 @@ export const config = {
   
   // Custom Aliases
   allowedAliases: [
+    'us',
     'shopping',
+    'etall',
+    'acell',
     'love',
     'surat',
-    'acel',
     'haikal',
     'secret',
     'order',

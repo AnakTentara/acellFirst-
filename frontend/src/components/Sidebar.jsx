@@ -193,8 +193,8 @@ export default function Sidebar({
           <span>Email Alias Aktif:</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {['shopping@', 'love@', 'acel@', 'haikal@'].map(a => (
-            <span key={a} style={{ background: 'rgba(0,0,0,0.04)', padding: '2px 5px', borderRadius: '4px', fontSize: '0.7rem' }}>
+          {['us@', 'shopping@', 'etall@', 'acell@', 'haikal@'].map(a => (
+            <span key={a} style={{ background: '#fff0f5', color: '#ff5c8a', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
               {a}
             </span>
           ))}
