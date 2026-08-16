@@ -24,41 +24,41 @@ export default function Sidebar({
   const navItems = [
     {
       id: 'inbox',
-      label: 'AcelMail Inbox',
+      label: 'AcellMail Inbox',
       icon: Inbox,
       badge: unreadStats?.unreadShopping || unreadStats?.unreadLove ? (unreadStats?.unreadShopping + unreadStats?.unreadLove) : null,
-      badgeColor: '#ff5c8a',
-      color: '#ff5c8a'
+      badgeColor: '#2563eb',
+      color: '#2563eb'
     },
     {
       id: 'shopping',
       label: 'Shopping & Resi',
       icon: ShoppingBag,
       badge: unreadStats?.activePackages || null,
-      badgeColor: '#ee4d2d',
-      color: '#ff7a00'
+      badgeColor: '#0284c7',
+      color: '#0284c7'
     },
     {
       id: 'love',
       label: 'Surat & Kapsul',
       icon: Heart,
       badge: unreadStats?.unreadLove || null,
-      badgeColor: '#9b5de5',
-      color: '#ff5c8a'
+      badgeColor: '#4f46e5',
+      color: '#4f46e5'
     },
     {
       id: 'wishlist',
       label: 'Shared Wishlist',
       icon: Sparkles,
       badge: null,
-      color: '#06d6a0'
+      color: '#0ea5e9'
     },
     {
       id: 'settings',
-      label: 'Domain & Sistem',
+      label: 'Domain & SMTP',
       icon: Settings,
       badge: null,
-      color: '#3a86ff'
+      color: '#1d4ed8'
     }
   ];
 
@@ -97,16 +97,16 @@ export default function Sidebar({
                 padding: '10px 14px',
                 borderRadius: '14px',
                 border: '1px solid',
-                borderColor: isActive ? 'rgba(255, 92, 138, 0.3)' : 'transparent',
+                borderColor: isActive ? 'rgba(37, 99, 235, 0.35)' : 'transparent',
                 background: isActive 
-                  ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 240, 246, 0.95) 100%)' 
+                  ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.95) 100%)' 
                   : 'transparent',
-                color: isActive ? 'var(--text-main)' : 'var(--text-secondary)',
+                color: isActive ? 'var(--brand-blue-deep)' : 'var(--text-secondary)',
                 fontWeight: isActive ? 700 : 600,
                 fontSize: '0.9rem',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: isActive ? '0 4px 16px rgba(255, 92, 138, 0.12)' : 'none'
+                boxShadow: isActive ? '0 4px 16px rgba(37, 99, 235, 0.12)' : 'none'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

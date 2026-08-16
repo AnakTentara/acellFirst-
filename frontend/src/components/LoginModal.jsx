@@ -57,29 +57,28 @@ export default function LoginModal({
         width: '100%',
         maxWidth: '420px',
         padding: '32px',
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)',
-        textAlign: 'center',
-        boxShadow: '0 20px 60px rgba(220, 150, 190, 0.3)',
-        border: '1px solid rgba(255, 255, 255, 0.9)'
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 247, 255, 0.98) 100%)',
+        boxShadow: '0 25px 60px -15px rgba(37, 99, 235, 0.25)',
+        textAlign: 'center'
       }}>
-        {/* Heart Icon Badge */}
+        {/* Header Icon */}
         <div style={{
           width: '56px',
           height: '56px',
           borderRadius: '20px',
-          background: 'linear-gradient(135deg, #ff6b9d 0%, #ff5c8a 100%)',
+          background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 16px auto',
           color: '#fff',
-          boxShadow: '0 8px 24px rgba(255, 92, 138, 0.4)'
+          boxShadow: '0 8px 20px rgba(37, 99, 235, 0.35)'
         }}>
           <Heart size={28} fill="#fff" className="pulse-heart" />
         </div>
 
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)', marginBottom: '6px' }}>
-          Selamat Datang, Cinta! ✨
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)', marginBottom: '4px' }}>
+          Acell & Haikal Sanctuary
         </h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '24px' }}>
           Pilih siapa yang sedang membuka sanctuary:

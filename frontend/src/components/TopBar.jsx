@@ -58,11 +58,11 @@ export default function TopBar({
           width: '42px',
           height: '42px',
           borderRadius: '14px',
-          background: 'linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%)',
+          background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 6px 16px rgba(255, 117, 140, 0.35)',
+          boxShadow: '0 6px 16px rgba(37, 99, 235, 0.35)',
           color: '#fff'
         }}>
           <Heart size={22} fill="#fff" className="pulse-heart" />
@@ -70,24 +70,24 @@ export default function TopBar({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h1 style={{ fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)' }}>
-              Acel & Haikal Sanctuary
+              Acell & Haikal Sanctuary
             </h1>
             <span style={{
-              background: 'linear-gradient(135deg, #fff0f5 0%, #ffe4ec 100%)',
-              border: '1px solid #ffd1dc',
-              color: '#ff4d80',
+              background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+              border: '1px solid #bfdbfe',
+              color: '#2563eb',
               padding: '2px 8px',
               borderRadius: '999px',
               fontSize: '0.72rem',
               fontWeight: 700
             }}>
-              ✨ Ekosistem Couple
+              🌌 Galactic Blue White
             </span>
           </div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: '#ff5c8a', fontWeight: 700 }}>{daysTogether || '...'}</span>
+            <span style={{ color: '#2563eb', fontWeight: 700 }}>{daysTogether || '...'}</span>
             <span>•</span>
-            <span>Domain: <code style={{ background: 'rgba(0,0,0,0.04)', padding: '1px 5px', borderRadius: '4px' }}>@{activeDomain}</code></span>
+            <span>Domain: <code style={{ background: 'rgba(37,99,235,0.06)', color: '#1d4ed8', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>@{activeDomain}</code></span>
           </p>
         </div>
       </div>

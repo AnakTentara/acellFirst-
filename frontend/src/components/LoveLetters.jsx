@@ -29,17 +29,17 @@ export default function LoveLetters({
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [newMusic, setNewMusic] = useState('');
-  const [newColor, setNewColor] = useState('#ff6b9d');
+  const [newColor, setNewColor] = useState('#2563eb');
   const [isLocked, setIsLocked] = useState(false);
   const [unlockDate, setUnlockDate] = useState('');
 
   const triggerConfetti = () => {
     try {
       confetti({
-        particleCount: 70,
-        spread: 60,
+        particleCount: 80,
+        spread: 70,
         origin: { y: 0.6 },
-        colors: ['#ff5c8a', '#ff9ebb', '#ffd1dc', '#ffb703', '#ffffff']
+        colors: ['#2563eb', '#38bdf8', '#818cf8', '#ec4899', '#ffffff']
       });
     } catch (e) {}
   };

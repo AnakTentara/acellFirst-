@@ -122,10 +122,16 @@ export const initDatabase = async () => {
       is_read_by_girl INTEGER DEFAULT 0,
       is_starred INTEGER DEFAULT 0,
       is_archived INTEGER DEFAULT 0,
+      is_outbound INTEGER DEFAULT 0,
+      is_draft INTEGER DEFAULT 0,
       attachments_json TEXT DEFAULT '[]',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migrations for existing DB files
+  try { await run(`ALTER TABLE emails ADD COLUMN is_outbound INTEGER DEFAULT 0`); } catch (e) {}
+  try { await run(`ALTER TABLE emails ADD COLUMN is_draft INTEGER DEFAULT 0`); } catch (e) {}
 
   await run(`
     CREATE TABLE IF NOT EXISTS shopping_items (

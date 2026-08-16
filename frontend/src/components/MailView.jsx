@@ -36,6 +36,7 @@ export default function MailView({
     { id: 'shopping', label: '🛍️ Belanja', icon: ShoppingBag },
     { id: 'love', label: '💌 Surat Cinta', icon: Heart },
     { id: 'personal', label: '👤 Personal', icon: User },
+    { id: 'sent', label: '📤 Terkirim', icon: Mail },
     { id: 'starred', label: '⭐ Berbintang', icon: Star }
   ];
 
@@ -43,7 +44,10 @@ export default function MailView({
     // Category match
     if (filterCategory === 'starred') {
       if (mail.is_starred !== 1) return false;
+    } else if (filterCategory === 'sent') {
+      if (mail.is_outbound !== 1) return false;
     } else if (filterCategory !== 'all') {
+      if (mail.is_outbound === 1) return false; // hide outbound from general inbox filter unless 'sent' or 'all'
       if (mail.category !== filterCategory) return false;
     }
 

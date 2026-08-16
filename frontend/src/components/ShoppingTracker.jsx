@@ -83,7 +83,7 @@ export default function ShoppingTracker({
             <span>🛍️ Shopping & Delivery Tracker</span>
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Otomatis terisi saat belanja pakai email <code style={{ background: '#fff0f5', color: '#ff5c8a', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>shopping@{activeDomain}</code>
+            Otomatis terisi saat belanja pakai email <code style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>shopping@{activeDomain}</code> atau <code style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>etall@{activeDomain}</code>
           </p>
         </div>
 
@@ -102,9 +102,9 @@ export default function ShoppingTracker({
 
       {/* Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-        <div className="glass-card" style={{ padding: '16px', background: 'linear-gradient(135deg, rgba(255, 240, 245, 0.9) 0%, rgba(255, 255, 255, 0.9) 100%)' }}>
+        <div className="glass-card" style={{ padding: '16px', background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.95) 0%, rgba(255, 255, 255, 0.95) 100%)', borderColor: '#bfdbfe' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>Total Belanja Bareng</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ff5c8a', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
             {formatRupiah(stats?.totalSpent)}
           </div>
         </div>

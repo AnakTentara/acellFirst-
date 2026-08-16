@@ -30,9 +30,15 @@ mailRouter.post('/inbound', async (req, res) => {
 // 2. Get Mail List with search & filters
 mailRouter.get('/inbox', async (req, res) => {
   try {
-    const { category, alias, search, starred, userRole } = req.query;
+    const { category, alias, search, starred, userRole, type } = req.query;
     let sql = `SELECT * FROM emails WHERE is_archived = 0`;
     const params = [];
+
+    if (type === 'sent') {
+      sql += ` AND is_outbound = 1`;
+    } else if (type === 'inbox') {
+      sql += ` AND (is_outbound = 0 OR is_outbound IS NULL)`;
+    }
 
     if (category && category !== 'all') {
       sql += ` AND category = ?`;
@@ -159,7 +165,19 @@ mailRouter.post('/send', async (req, res) => {
   }
 });
 
-// 8. Simulator for Testing (Shopee, Tokped, TikTok, Love Letter)
+// 8. Test & Verify SMTP Server Connection
+mailRouter.post('/verify-smtp', async (req, res) => {
+  try {
+    const { host, port, user, pass, secure } = req.body;
+    const customSmtp = host ? { host, port: parseInt(port, 10), user, pass, secure: Boolean(secure) } : null;
+    const result = await verifySmtpConnection(customSmtp);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ connected: false, error: err.message });
+  }
+});
+
+// 9. Simulator for Testing (Shopee, Tokped, TikTok, Love Letter)
 mailRouter.post('/simulate-test', async (req, res) => {
   try {
     const { type } = req.body; // 'shopee', 'tokopedia', 'tiktok', 'love_letter'
@@ -172,14 +190,14 @@ mailRouter.post('/simulate-test', async (req, res) => {
         from: 'order@shopee.co.id',
         fromName: 'Shopee Indonesia',
         to: `shopping@${domain}`,
-        subject: `Pesanan #${orderId} Sedang Dikirim! [Cute Pink Aesthetic Desk Mat & Mug]`,
-        text: `Pesanan Shopee Anda #${orderId} telah dikirim dengan kurir SPX Express (Nomor Resi: ${orderId}). Total Pembayaran: Rp 185.000. Paket sedang menuju ke alamat Acel & Haikal Sanctuary.`,
-        html: `<div style="font-family: sans-serif; padding: 20px; border-left: 4px solid #ee4d2d; background: #fff;">
-          <h3 style="color: #ee4d2d;">Pesanan Shopee Anda Sedang Dikirim! 📦</h3>
-          <p>Halo Acel & Haikal! Paket belanjaan kesayangan kalian sedang dalam perjalanan.</p>
+        subject: `Pesanan #${orderId} Sedang Dikirim! [Galactic Blue Mechanical Keyboard & Desk Mat]`,
+        text: `Pesanan Shopee Anda #${orderId} telah dikirim dengan kurir SPX Express (Nomor Resi: ${orderId}). Total Pembayaran: Rp 285.000. Paket sedang menuju ke alamat Acell & Haikal Sanctuary.`,
+        html: `<div style="font-family: sans-serif; padding: 20px; border-left: 4px solid #2563eb; background: #fff;">
+          <h3 style="color: #2563eb;">Pesanan Shopee Anda Sedang Dikirim! 📦</h3>
+          <p>Halo Acell & Haikal! Paket belanjaan kesayangan kalian sedang dalam perjalanan.</p>
           <p><b>Nomor Pesanan:</b> #${orderId}<br/><b>Kurir:</b> SPX Express Standard<br/><b>Resi:</b> ${orderId}</p>
-          <p><b>Item:</b> Cute Pink Aesthetic Desk Mat + Ceramic Couple Mug</p>
-          <p><b>Total Pembayaran:</b> Rp 185.000 (Lunas)</p>
+          <p><b>Item:</b> Galactic Blue Aesthetic Desk Mat + Couple Mug</p>
+          <p><b>Total Pembayaran:</b> Rp 285.000 (Lunas)</p>
         </div>`
       };
     } else if (type === 'tokopedia') {
@@ -187,15 +205,15 @@ mailRouter.post('/simulate-test', async (req, res) => {
       payload = {
         from: 'no-reply@tokopedia.com',
         fromName: 'Tokopedia Care',
-        to: `shopping@${domain}`,
-        subject: `Pembayaran Berhasil untuk ${invNum} [Mechanical Keyboard Cute Pastels]`,
-        text: `Pembayaran untuk transaksi ${invNum} di Tokopedia berhasil. Kurir: SiCepat (Resi: 004819284192). Total Pembayaran: Rp 550.000.`,
+        to: `etall@${domain}`,
+        subject: `Pembayaran Berhasil untuk ${invNum} [Aesthetic Blue Lamp & Skincare]`,
+        text: `Pembayaran untuk transaksi ${invNum} di Tokopedia berhasil. Kurir: SiCepat (Resi: 004819284192). Total Pembayaran: Rp 450.000.`,
         html: `<div style="font-family: sans-serif; padding: 20px; border-left: 4px solid #03ac0e; background: #fff;">
           <h3 style="color: #03ac0e;">Pembayaran Terverifikasi! 🛍️</h3>
           <p><b>Invoice:</b> ${invNum}</p>
-          <p><b>Barang:</b> Mechanical Keyboard Cute Pastels Custom Sound</p>
+          <p><b>Barang:</b> Aesthetic Blue Crystal Lamp & Skincare Glow Set</p>
           <p><b>Kurir:</b> SiCepat Express (004819284192)</p>
-          <p><b>Total:</b> Rp 550.000</p>
+          <p><b>Total:</b> Rp 450.000</p>
         </div>`
       };
     } else if (type === 'tiktok') {
@@ -203,26 +221,26 @@ mailRouter.post('/simulate-test', async (req, res) => {
         from: 'order-update@tiktokshop.com',
         fromName: 'TikTok Shop ID',
         to: `shopping@${domain}`,
-        subject: `Paket TikTok Shop Kamu Sedang Dikirim! [Matcha Latte Premium Powder & Snack]`,
-        text: `Pesanan TikTok Shop Anda telah diserahkan ke kurir J&T Express (Resi: JX9827361928). Total Belanja: Rp 120.000.`,
-        html: `<div style="font-family: sans-serif; padding: 20px; border-left: 4px solid #fe2c55; background: #fff;">
-          <h3 style="color: #fe2c55;">TikTok Shop - Paket Dikirim 🎶</h3>
-          <p>Pesanan matcha dan snack kesukaan kalian sedang menuju alamatmu!</p>
+        subject: `Paket TikTok Shop Kamu Sedang Dikirim! [Matcha Latte & Cute Blue Tumbler]`,
+        text: `Pesanan TikTok Shop Anda telah diserahkan ke kurir J&T Express (Resi: JX9827361928). Total Belanja: Rp 165.000.`,
+        html: `<div style="font-family: sans-serif; padding: 20px; border-left: 4px solid #0284c7; background: #fff;">
+          <h3 style="color: #0284c7;">TikTok Shop - Paket Dikirim 🎶</h3>
+          <p>Pesanan matcha dan tumbler biru kesukaan kalian sedang menuju alamatmu!</p>
           <p><b>Resi:</b> JX9827361928 (J&T Express)</p>
-          <p><b>Total:</b> Rp 120.000</p>
+          <p><b>Total:</b> Rp 165.000</p>
         </div>`
       };
     } else {
       payload = {
         from: `haikal@${domain}`,
         fromName: 'Haikal (My Boy 💙)',
-        to: `love@${domain}`,
-        subject: 'Cuma mau bilang, I love you so much today! 🌸💖',
+        to: `us@${domain}`,
+        subject: 'Cuma mau bilang, I love you to the stars and back! 🌌💙',
         text: 'Jangan lupa senyum dan makan yang teratur ya sayang! Nanti malem kita telfonan yaa 🥰',
-        html: `<div style="font-family: sans-serif; padding: 24px; background: #fff0f5; border-radius: 16px; color: #444;">
-          <h3 style="color: #d63384;">Cuma mau bilang... 💖</h3>
-          <p>Hai Acel cantik! Makasih udah selalu jadi orang yang paling bikin aku semangat setiap hari.</p>
-          <p>Semoga harimu menyenangkan dan jangan lupa istirahat ya! Love you always! ✨</p>
+        html: `<div style="font-family: sans-serif; padding: 24px; background: #f0f7ff; border-radius: 16px; color: #1e293b; border: 1px solid #bfdbfe;">
+          <h3 style="color: #2563eb;">Cuma mau bilang... 💙</h3>
+          <p>Hai Acell cantik! Makasih udah selalu jadi orang yang paling bikin aku semangat setiap hari.</p>
+          <p>Semoga harimu menyenangkan dan jangan lupa istirahat ya! Love you always! 🌌✨</p>
         </div>`
       };
     }

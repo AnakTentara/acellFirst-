@@ -10,9 +10,13 @@ import {
   Calendar, 
   Mail,
   Zap,
-  Info
+  Info,
+  Code,
+  CheckCircle2,
+  AlertTriangle,
+  Play
 } from 'lucide-react';
-import { systemApi } from '../services/api';
+import { systemApi, mailApi } from '../services/api';
 import { playClick, playHeartPop } from '../utils/sound';
 
 export default function SettingsModal({
@@ -21,11 +25,30 @@ export default function SettingsModal({
   systemConfig,
   onDomainUpdated
 }) {
-  const [activeDomainInput, setActiveDomainInput] = useState(systemConfig?.activeDomain || '');
+  const [activeTab, setActiveTab] = useState('domain'); // 'domain', 'smtp', 'apidocs'
+  const [activeDomainInput, setActiveDomainInput] = useState(systemConfig?.activeDomain || 'acellimut.my.id');
   const [dnsGuide, setDnsGuide] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState(null);
+
+  // SMTP Testing state
+  const [smtpForm, setSmtpForm] = useState({
+    host: '',
+    port: '587',
+    user: '',
+    pass: '',
+    secure: false
+  });
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const [smtpResult, setSmtpResult] = useState(null);
+
+  // API Tester state
+  const [apiEndpoint, setApiEndpoint] = useState('/api/love/counter');
+  const [apiMethod, setApiMethod] = useState('GET');
+  const [apiPayload, setApiPayload] = useState('{}');
+  const [apiResponse, setApiResponse] = useState(null);
+  const [apiLoading, setApiLoading] = useState(false);
 
   useEffect(() => {
     if (systemConfig?.activeDomain) {
@@ -68,8 +91,41 @@ export default function SettingsModal({
     }
   };
 
-  const handlePresetSwitch = (domain) => {
-    setActiveDomainInput(domain);
+  const handleTestSmtp = async (e) => {
+    e.preventDefault();
+    setSmtpTesting(true);
+    setSmtpResult(null);
+    try {
+      const res = await mailApi.verifySmtp(smtpForm.host ? smtpForm : {});
+      setSmtpResult(res);
+      playClick();
+    } catch (err) {
+      setSmtpResult({ connected: false, message: err.message });
+    } finally {
+      setSmtpTesting(false);
+    }
+  };
+
+  const handleRunApiTest = async () => {
+    setApiLoading(true);
+    setApiResponse(null);
+    try {
+      const options = {
+        method: apiMethod,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      if (apiMethod !== 'GET') {
+        options.body = apiPayload;
+      }
+      const res = await fetch(apiEndpoint, options);
+      const data = await res.json();
+      setApiResponse(data);
+      playClick();
+    } catch (err) {
+      setApiResponse({ error: err.message });
+    } finally {
+      setApiLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -81,8 +137,8 @@ export default function SettingsModal({
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.4)',
-      backdropFilter: 'blur(10px)',
+      background: 'rgba(15, 23, 42, 0.45)',
+      backdropFilter: 'blur(12px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -91,34 +147,36 @@ export default function SettingsModal({
     }}>
       <div className="glass-panel" style={{
         width: '100%',
-        maxWidth: '680px',
-        maxHeight: '90vh',
+        maxWidth: '720px',
+        maxHeight: '92vh',
         overflowY: 'auto',
         padding: '28px',
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 252, 255, 0.98) 100%)',
-        position: 'relative'
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 255, 0.98) 100%)',
+        position: 'relative',
+        boxShadow: '0 25px 50px -12px rgba(37, 99, 235, 0.25)'
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(219, 234, 254, 0.8)', paddingBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #3a86ff 0%, #00b4d8 100%)',
+              width: '40px',
+              height: '40px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%)',
               color: '#fff',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
             }}>
               <Globe size={20} />
             </div>
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)' }}>
-                Pengaturan Domain & Cloudflare
+                Sistem & Pengaturan Acell Sanctuary
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Fleksibel ganti domain kapan saja antara staging dan domain utama
+                Konfigurasi Domain, SMTP Outbound, dan Dokumentasi API Terintegrasi
               </p>
             </div>
           </div>
@@ -132,6 +190,34 @@ export default function SettingsModal({
           </button>
         </div>
 
+        {/* Tab Navigation */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid rgba(219, 234, 254, 0.6)', paddingBottom: '10px' }}>
+          <button
+            onClick={() => setActiveTab('domain')}
+            className={`glass-pill ${activeTab === 'domain' ? 'active' : ''}`}
+            style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+          >
+            <Globe size={14} />
+            Domain & Zero Trust
+          </button>
+          <button
+            onClick={() => setActiveTab('smtp')}
+            className={`glass-pill ${activeTab === 'smtp' ? 'active' : ''}`}
+            style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+          >
+            <Mail size={14} />
+            SMTP Outbound Mail
+          </button>
+          <button
+            onClick={() => setActiveTab('apidocs')}
+            className={`glass-pill ${activeTab === 'apidocs' ? 'active' : ''}`}
+            style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+          >
+            <Code size={14} />
+            Dokumentasi & API Tester
+          </button>
+        </div>
+
         {message && (
           <div style={{
             padding: '12px 16px',
@@ -139,164 +225,295 @@ export default function SettingsModal({
             marginBottom: '18px',
             fontSize: '0.85rem',
             fontWeight: 600,
-            background: message.type === 'success' ? '#ecfdf5' : '#fef2f2',
-            color: message.type === 'success' ? '#059669' : '#dc2626',
-            border: `1px solid ${message.type === 'success' ? '#a7f3d0' : '#fecaca'}`
+            background: message.type === 'success' ? '#eff6ff' : '#fef2f2',
+            color: message.type === 'success' ? '#2563eb' : '#dc2626',
+            border: `1px solid ${message.type === 'success' ? '#bfdbfe' : '#fecaca'}`
           }}>
             {message.text}
           </div>
         )}
 
-        {/* 1. Dynamic Domain Switcher */}
-        <form onSubmit={handleSaveDomain} className="glass-card" style={{ padding: '20px', marginBottom: '20px', background: '#fff' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <Zap size={16} color="#3a86ff" />
-            <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>Ganti Domain Aktif Seketika</h3>
-          </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.4 }}>
-            Semua alamat email (<code>shopping@</code>, <code>love@</code>, <code>acel@</code>, <code>haikal@</code>) akan langsung otomatis berganti ke domain yang kamu set di sini tanpa perlu rebuild/restart!
-          </p>
-
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <input
-              type="text"
-              required
-              className="glass-input"
-              style={{ fontWeight: 700 }}
-              value={activeDomainInput}
-              onChange={(e) => setActiveDomainInput(e.target.value)}
-              placeholder="acellimut.haikaldev.my.id atau acellimut.net"
-            />
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="glass-btn glass-btn-primary"
-              style={{ whiteSpace: 'nowrap', padding: '10px 20px' }}
-            >
-              {isSaving ? 'Menyimpan...' : 'Ganti Domain'}
-            </button>
-          </div>
-
-          {/* Quick preset buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pilihan Domain:</span>
-            <button
-              type="button"
-              onClick={() => handlePresetSwitch('acellimut.my.id')}
-              className="glass-pill"
-              style={{ fontSize: '0.72rem', padding: '3px 8px', background: '#fff0f5', color: '#ff5c8a', borderColor: '#ffd1dc' }}
-            >
-              💖 acellimut.my.id (Utama)
-            </button>
-          </div>
-        </form>
-
-        {/* 2. Cloudflare Worker Webhook Info */}
-        <div className="glass-card" style={{ padding: '20px', marginBottom: '20px', background: '#fff' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <ShieldCheck size={16} color="#059669" />
-            <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>Webhook Endpoint Cloudflare Worker</h3>
-          </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-            Masukkan URL dan Secret ini ke Cloudflare Worker (<code>cloudflare/worker.js</code>) untuk meneruskan email masuk:
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{
-              background: '#f8fafc',
-              padding: '10px 14px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              border: '1px solid #e2e8f0'
-            }}>
-              <div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>WEBHOOK_URL:</div>
-                <code style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
-                  https://{activeDomainInput || 'acellimut.haikaldev.my.id'}/api/mail/inbound
-                </code>
-              </div>
-              <button
-                onClick={() => handleCopy('webhook', `https://${activeDomainInput || 'acellimut.haikaldev.my.id'}/api/mail/inbound`)}
-                className="glass-btn"
-                style={{ padding: '6px 10px', fontSize: '0.72rem' }}
-              >
-                {copiedKey === 'webhook' ? <Check size={13} color="#059669" /> : <Copy size={13} />}
-                <span>{copiedKey === 'webhook' ? 'Disalin' : 'Salin'}</span>
-              </button>
-            </div>
-
-            <div style={{
-              background: '#f8fafc',
-              padding: '10px 14px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              border: '1px solid #e2e8f0'
-            }}>
-              <div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>WEBHOOK_SECRET:</div>
-                <code style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
-                  {systemConfig?.webhookSecret || 'couple_secret_token_123'}
-                </code>
-              </div>
-              <button
-                onClick={() => handleCopy('secret', systemConfig?.webhookSecret || 'couple_secret_token_123')}
-                className="glass-btn"
-                style={{ padding: '6px 10px', fontSize: '0.72rem' }}
-              >
-                {copiedKey === 'secret' ? <Check size={13} color="#059669" /> : <Copy size={13} />}
-                <span>{copiedKey === 'secret' ? 'Disalin' : 'Salin'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. DNS Records Guide */}
-        {dnsGuide && dnsGuide.dnsRecords && (
-          <div className="glass-card" style={{ padding: '20px', background: '#fff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <Server size={16} color="#8338ec" />
-              <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>DNS Record Cloudflare untuk {activeDomainInput}</h3>
-            </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              Salin record ini ke tab <b>DNS</b> di Cloudflare Dashboard kamu:
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {dnsGuide.dnsRecords.map((rec, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: '#f9f9fb',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1px solid #eee',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '0.8rem'
-                  }}
+        {/* TAB 1: DOMAIN & ZERO TRUST */}
+        {activeTab === 'domain' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="glass-card" style={{ padding: '18px', background: 'rgba(255, 255, 255, 0.9)' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '10px', color: 'var(--text-main)' }}>
+                🌐 Domain Aktif
+              </h3>
+              <form onSubmit={handleSaveDomain} style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  value={activeDomainInput}
+                  onChange={(e) => setActiveDomainInput(e.target.value.toLowerCase().trim())}
+                  placeholder="acellimut.my.id"
+                  className="glass-input"
+                  style={{ flex: 1, fontSize: '0.9rem' }}
+                />
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="glass-btn glass-btn-primary"
+                  style={{ whiteSpace: 'nowrap', padding: '0 20px' }}
                 >
-                  <div>
-                    <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '2px 6px', borderRadius: '4px', fontWeight: 800, marginRight: '8px', fontSize: '0.7rem' }}>
-                      {rec.type}
-                    </span>
-                    <span style={{ fontWeight: 700 }}>{rec.name}</span> &rarr; <code>{rec.content}</code> {rec.priority ? `(Priority: ${rec.priority})` : ''}
-                    <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '2px' }}>{rec.purpose}</div>
+                  {isSaving ? 'Menyimpan...' : 'Simpan Domain'}
+                </button>
+              </form>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Domain utama: <code style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>acellimut.my.id</code>
+              </div>
+            </div>
+
+            {/* Zero Trust & Webhook Guide */}
+            <div className="glass-card" style={{ padding: '18px', background: 'rgba(255, 255, 255, 0.9)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <ShieldCheck size={18} color="#2563eb" />
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  Konfigurasi Cloudflare Zero Trust & Email Routing
+                </h4>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.82rem' }}>
+                <div style={{ padding: '12px', background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+                  <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: '4px' }}>
+                    1. Cloudflare Zero Trust Tunnel (Port 23625):
                   </div>
+                  <p style={{ color: '#3b82f6', margin: 0 }}>
+                    Arahkan Public Hostname <b>acellimut.my.id</b> &rarr; Service: <code>HTTP://localhost:23625</code>
+                  </p>
+                </div>
+
+                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>2. Webhook Inbound Endpoint:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('webhook_url', `https://${activeDomainInput}/api/mail/inbound`)}
+                      className="glass-pill"
+                      style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                    >
+                      {copiedKey === 'webhook_url' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                      Salin URL
+                    </button>
+                  </div>
+                  <code style={{ fontSize: '0.78rem', color: '#2563eb' }}>
+                    https://{activeDomainInput}/api/mail/inbound
+                  </code>
+                </div>
+
+                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>3. Webhook Secret:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('secret', 'Senin23062025')}
+                      className="glass-pill"
+                      style={{ fontSize: '0.7rem', padding: '2px 8px' }}
+                    >
+                      {copiedKey === 'secret' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                      Salin Secret
+                    </button>
+                  </div>
+                  <code style={{ fontSize: '0.78rem', color: '#4f46e5', fontWeight: 700 }}>
+                    Senin23062025
+                  </code>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: SMTP OUTBOUND */}
+        {activeTab === 'smtp' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div className="glass-card" style={{ padding: '18px', background: 'rgba(255, 255, 255, 0.9)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <Mail size={18} color="#2563eb" />
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  Pengaturan & Uji Koneksi SMTP Outbound
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+                Gunakan SMTP gratis seperti <b>Resend</b>, <b>Brevo</b>, atau <b>Gmail App Password</b> untuk mengirim email nyata ke luar (ke Gmail/Yahoo dll). Jika belum diisi, pengiriman email berjalan dalam <b>Mode Simulasi Preview</b> yang aman.
+              </p>
+
+              <form onSubmit={handleTestSmtp} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    SMTP Host (contoh: smtp.resend.com / smtp.gmail.com)
+                  </label>
+                  <input
+                    type="text"
+                    value={smtpForm.host}
+                    onChange={(e) => setSmtpForm({ ...smtpForm, host: e.target.value })}
+                    placeholder="smtp.resend.com"
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Port
+                  </label>
+                  <input
+                    type="text"
+                    value={smtpForm.port}
+                    onChange={(e) => setSmtpForm({ ...smtpForm, port: e.target.value })}
+                    placeholder="587"
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    SMTP Username / Email
+                  </label>
+                  <input
+                    type="text"
+                    value={smtpForm.user}
+                    onChange={(e) => setSmtpForm({ ...smtpForm, user: e.target.value })}
+                    placeholder="resend"
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    SMTP Password / API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={smtpForm.pass}
+                    onChange={(e) => setSmtpForm({ ...smtpForm, pass: e.target.value })}
+                    placeholder="re_..."
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={smtpForm.secure}
+                      onChange={(e) => setSmtpForm({ ...smtpForm, secure: e.target.checked })}
+                    />
+                    <span>Gunakan SSL/TLS (Port 465)</span>
+                  </label>
 
                   <button
-                    onClick={() => handleCopy(`dns_${idx}`, rec.content)}
-                    className="glass-btn"
-                    style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                    type="submit"
+                    disabled={smtpTesting}
+                    className="glass-btn glass-btn-primary"
+                    style={{ padding: '8px 20px', fontSize: '0.85rem' }}
                   >
-                    {copiedKey === `dns_${idx}` ? <Check size={12} color="#059669" /> : <Copy size={12} />}
+                    <Zap size={14} />
+                    {smtpTesting ? 'Menguji...' : 'Uji Koneksi SMTP'}
                   </button>
                 </div>
-              ))}
+              </form>
+
+              {smtpResult && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  fontSize: '0.85rem',
+                  background: smtpResult.connected ? '#eff6ff' : '#fef2f2',
+                  border: `1px solid ${smtpResult.connected ? '#bfdbfe' : '#fecaca'}`,
+                  color: smtpResult.connected ? '#1e40af' : '#dc2626'
+                }}>
+                  <div style={{ fontWeight: 800, marginBottom: '4px' }}>
+                    {smtpResult.connected ? '🎉 SMTP Terkoneksi!' : '⚠️ Info SMTP'}
+                  </div>
+                  <div>{smtpResult.message}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: API DOCUMENTATION & TESTER */}
+        {activeTab === 'apidocs' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="glass-card" style={{ padding: '16px', background: 'rgba(255, 255, 255, 0.9)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Code size={18} color="#2563eb" />
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  Interactive API Explorer
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                Pilih endpoint di bawah untuk uji respons JSON secara langsung:
+              </p>
+
+              {/* Endpoint Preset Buttons */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+                {[
+                  { m: 'GET', url: '/api/love/counter', label: '💕 Love Counter' },
+                  { m: 'GET', url: '/api/auth/profiles', label: '👥 User Profiles' },
+                  { m: 'GET', url: '/api/mail/inbox', label: '📬 Mail Inbox' },
+                  { m: 'GET', url: '/api/shopping/items', label: '🛍️ Shopping Items' },
+                  { m: 'GET', url: '/api/wishlist/items', label: '✨ Wishlist' },
+                  { m: 'GET', url: '/api/system/config', label: '⚙️ System Config' }
+                ].map(ep => (
+                  <button
+                    key={ep.url}
+                    type="button"
+                    onClick={() => {
+                      setApiMethod(ep.m);
+                      setApiEndpoint(ep.url);
+                    }}
+                    className="glass-pill"
+                    style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                  >
+                    <b>{ep.m}</b> {ep.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Runner Bar */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <select
+                  value={apiMethod}
+                  onChange={(e) => setApiMethod(e.target.value)}
+                  className="glass-input"
+                  style={{ width: '100px', fontSize: '0.85rem', fontWeight: 700 }}
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PATCH">PATCH</option>
+                  <option value="DELETE">DELETE</option>
+                </select>
+
+                <input
+                  type="text"
+                  value={apiEndpoint}
+                  onChange={(e) => setApiEndpoint(e.target.value)}
+                  className="glass-input"
+                  style={{ flex: 1, fontSize: '0.85rem', fontFamily: 'monospace' }}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleRunApiTest}
+                  disabled={apiLoading}
+                  className="glass-btn glass-btn-primary"
+                  style={{ padding: '0 18px', fontSize: '0.85rem' }}
+                >
+                  <Play size={14} />
+                  {apiLoading ? 'Memanggil...' : 'Send'}
+                </button>
+              </div>
+
+              {/* Response Viewer */}
+              {apiResponse && (
+                <div style={{ background: '#0f172a', borderRadius: '12px', padding: '14px', color: '#38bdf8', fontSize: '0.78rem', fontFamily: 'monospace', maxHeight: '220px', overflowY: 'auto' }}>
+                  <pre>{JSON.stringify(apiResponse, null, 2)}</pre>
+                </div>
+              )}
             </div>
           </div>
         )}

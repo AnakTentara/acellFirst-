@@ -177,28 +177,157 @@ export async function processInboundEmail(payload) {
 }
 
 /**
- * Send an outbound email
+ * Build Galactic Blue styled HTML Email template
  */
-export async function sendOutboundEmail({ fromAlias = 'love', to, subject, html, text, fromName }) {
-  const fromEmail = `${fromAlias}@${config.activeDomain}`;
-  const senderDisplay = fromName || config.smtp.fromName;
+export function buildGalacticEmailHtml({ title, content, senderName, domain }) {
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f6faff; margin: 0; padding: 24px; color: #0f172a; }
+      .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #dbeafe; box-shadow: 0 10px 30px rgba(37,99,235,0.08); }
+      .header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%); padding: 28px 24px; text-align: center; color: #ffffff; }
+      .header h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+      .header p { margin: 6px 0 0 0; font-size: 13px; opacity: 0.9; }
+      .content { padding: 32px 28px; line-height: 1.7; font-size: 15px; color: #1e293b; white-space: pre-wrap; }
+      .footer { background: #f8fafc; padding: 20px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+      .badge { display: inline-block; background: #eff6ff; color: #2563eb; font-weight: 700; padding: 4px 10px; border-radius: 999px; font-size: 11px; margin-top: 12px; border: 1px solid #bfdbfe; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🌌 ${title || 'Acell & Haikal Sanctuary'}</h1>
+        <p>Private Couple Mail System • ${domain || 'acellimut.my.id'}</p>
+      </div>
+      <div class="content">${content}</div>
+      <div class="footer">
+        <div>Dikirim oleh <b>${senderName || 'Haikal & Acell'}</b> lewat <b>Acell & Haikal Sanctuary</b> 💙</div>
+        <div class="badge">✨ Verified Custom Domain Email</div>
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+}
 
-  if (!transporter) {
-    console.log(`[SIMULATED OUTBOUND MAIL] From: ${senderDisplay} <${fromEmail}> To: ${to} Subject: ${subject}`);
+/**
+ * Test & Verify SMTP Server Connection
+ */
+export async function verifySmtpConnection(customSmtp) {
+  const smtpConfig = customSmtp || config.smtp;
+  if (!smtpConfig.host || !smtpConfig.user) {
     return {
-      success: true,
-      simulated: true,
-      message: 'Email dikirim (Simulasi Preview - konfigurasi SMTP di .env untuk live outbound)'
+      connected: false,
+      message: 'SMTP belum dikonfigurasi di .env (Host & User masih kosong). Outbound saat ini berjalan dalam mode Simulasi Preview.'
     };
   }
 
-  const result = await transporter.sendMail({
-    from: `"${senderDisplay}" <${fromEmail}>`,
-    to,
-    subject,
-    text,
-    html
+  try {
+    const testTransporter = nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      secure: smtpConfig.secure,
+      auth: {
+        user: smtpConfig.user,
+        pass: smtpConfig.pass
+      }
+    });
+
+    await testTransporter.verify();
+    return {
+      connected: true,
+      message: `✅ SMTP Handshake Berhasil ke ${smtpConfig.host}:${smtpConfig.port} sebagai ${smtpConfig.user}`
+    };
+  } catch (err) {
+    return {
+      connected: false,
+      error: err.message,
+      message: `❌ Gagal menghubungi SMTP server: ${err.message}`
+    };
+  }
+}
+
+/**
+ * Send an outbound email & save to Sent database
+ */
+export async function sendOutboundEmail({ fromAlias = 'us', to, subject, html, text, fromName }) {
+  const fromEmail = `${fromAlias}@${config.activeDomain}`;
+  const senderDisplay = fromName || `${config.boyName} & ${config.girlName} (${config.smtp.fromName})`;
+
+  const formattedHtml = html || buildGalacticEmailHtml({
+    title: subject,
+    content: text || '',
+    senderName: senderDisplay,
+    domain: config.activeDomain
   });
 
-  return { success: true, messageId: result.messageId };
+  const emailId = `sent_${Date.now()}_${uuidv4().slice(0, 8)}`;
+  let isSimulated = false;
+  let messageId = `msg_${Date.now()}`;
+
+  if (!transporter && (!config.smtp.host || !config.smtp.user)) {
+    isSimulated = true;
+    console.log(`[SIMULATED OUTBOUND MAIL] From: ${senderDisplay} <${fromEmail}> To: ${to} Subject: ${subject}`);
+  } else {
+    try {
+      const activeTransporter = transporter || nodemailer.createTransport({
+        host: config.smtp.host,
+        port: config.smtp.port,
+        secure: config.smtp.secure,
+        auth: { user: config.smtp.user, pass: config.smtp.pass }
+      });
+
+      const result = await activeTransporter.sendMail({
+        from: `"${senderDisplay}" <${fromEmail}>`,
+        to,
+        subject,
+        text: text || '',
+        html: formattedHtml
+      });
+      messageId = result.messageId || messageId;
+    } catch (err) {
+      console.warn('⚠️ SMTP send error, falling back to simulated save:', err.message);
+      isSimulated = true;
+    }
+  }
+
+  // Save record to emails table as outbound
+  await run(`
+    INSERT INTO emails (
+      id, message_id, from_address, from_name, to_address, alias_name,
+      subject, text_body, html_body, category, is_read_by_boy, is_read_by_girl,
+      is_outbound, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'general', 1, 1, 1, datetime('now'))
+  `, [
+    emailId,
+    messageId,
+    fromEmail,
+    senderDisplay,
+    to,
+    fromAlias,
+    subject,
+    text || '',
+    formattedHtml
+  ]);
+
+  broadcastEvent('outbound_email_sent', {
+    id: emailId,
+    to,
+    fromEmail,
+    subject,
+    isSimulated
+  });
+
+  return {
+    success: true,
+    emailId,
+    messageId,
+    isSimulated,
+    message: isSimulated 
+      ? `Email tersimpan di Outbox/Sent (Simulasi Preview - isi SMTP di .env untuk pengiriman nyata ke internet)`
+      : `Email berhasil dikirim secara live ke ${to}!`
+  };
 }

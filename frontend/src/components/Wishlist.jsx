@@ -46,7 +46,7 @@ export default function Wishlist({
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#06d6a0', '#ff5c8a', '#ffd1dc', '#ffb703', '#ffffff']
+        colors: ['#2563eb', '#06d6a0', '#38bdf8', '#818cf8', '#ffffff']
       });
     } catch (e) {}
 

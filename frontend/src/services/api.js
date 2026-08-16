@@ -41,6 +41,7 @@ export const mailApi = {
   },
   getMail: (id) => request(`/api/mail/${id}`),
   sendMail: (data) => request('/api/mail/send', { method: 'POST', body: JSON.stringify(data) }),
+  verifySmtp: (data) => request('/api/mail/verify-smtp', { method: 'POST', body: JSON.stringify(data) }),
   markRead: (id, role) => request(`/api/mail/${id}/read`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   toggleStar: (id) => request(`/api/mail/${id}/star`, { method: 'PATCH' }),
   deleteMail: (id) => request(`/api/mail/${id}`, { method: 'DELETE' }),
