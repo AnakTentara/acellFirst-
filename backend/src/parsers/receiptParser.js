@@ -73,11 +73,15 @@ export function parseReceiptEmail(email) {
 
   const courierPatterns = [
     { name: 'SPX Express', regex: /spx|shopee express/i, resiRegex: /(SPX[A-Z0-9]{8,20})/i },
-    { name: 'J&T Express', regex: /j&t|jnt/i, resiRegex: /(Jx[0-9]{8,16}|[0-9]{12})/i },
-    { name: 'SiCepat', regex: /sicepat/i, resiRegex: /(00[0-9]{10,14})/i },
+    { name: 'J&T Express', regex: /j&t|jnt|jet express/i, resiRegex: /(Jx[0-9]{8,16}|JP[0-9]{8,16}|[0-9]{12})/i },
+    { name: 'SiCepat Express', regex: /sicepat/i, resiRegex: /(00[0-9]{10,14})/i },
+    { name: 'Lion Parcel', regex: /lion parcel|lionparcel/i, resiRegex: /(LP[0-9]{8,14}|[0-9]{11,15})/i },
     { name: 'Anteraja', regex: /anteraja/i, resiRegex: /(1000[0-9]{8,14})/i },
     { name: 'JNE Express', regex: /jne/i, resiRegex: /(JNE[0-9]{8,14}|[0-9]{13,16})/i },
     { name: 'Ninja Xpress', regex: /ninja/i, resiRegex: /(NVID[0-9]{8,14})/i },
+    { name: 'POS Indonesia', regex: /pos indonesia|kantor pos/i, resiRegex: /(P[0-9]{11,14})/i },
+    { name: 'Paxel', regex: /paxel/i, resiRegex: /(EM\.[A-Za-z0-9\-]{8,16})/i },
+    { name: 'ID Express', regex: /id express|idx/i, resiRegex: /(IDE[0-9]{10,14})/i },
     { name: 'GoSend / GrabExpress', regex: /gosend|grabexpress|instant/i, resiRegex: /(GK-[0-9]{6,12})/i }
   ];
 

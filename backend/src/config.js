@@ -51,6 +51,13 @@ export const config = {
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    fromName: process.env.SMTP_FROM_NAME || 'Acel & Haikal Sanctuary'
+    fromName: process.env.SMTP_FROM_NAME || 'Acell & Haikal Sanctuary'
+  },
+
+  // AI Email & Receipt Intelligence (OhhMyAgent / OpenAI / GPT-5.6)
+  ai: {
+    apiKey: process.env.AI_API_KEY || '',
+    baseUrl: process.env.AI_BASE_URL || 'https://ohhmyagent.com/v1',
+    model: process.env.AI_MODEL || 'ohh/gpt-5.6'
   }
 };

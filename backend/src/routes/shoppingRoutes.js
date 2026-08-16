@@ -30,7 +30,19 @@ shoppingRouter.get('/items', async (req, res) => {
         ELSE 4
       END ASC, updated_at DESC`;
 
-    const items = await query(sql, params);
+    const rawItems = await query(sql, params);
+    const items = rawItems.map(item => {
+      let timeline = [];
+      let coordinates = {};
+      try { timeline = JSON.parse(item.timeline_json || '[]'); } catch(e) {}
+      try { coordinates = JSON.parse(item.coordinates_json || '{}'); } catch(e) {}
+      return {
+        ...item,
+        timeline,
+        coordinates
+      };
+    });
+
     res.json({ success: true, items });
   } catch (err) {
     res.status(500).json({ error: err.message });

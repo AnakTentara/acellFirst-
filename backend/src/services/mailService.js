@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { run, getOne } from '../db.js';
 import { config } from '../config.js';
 import { parseReceiptEmail } from '../parsers/receiptParser.js';
+import { analyzeEmailWithAI, getCourierTrackingUrl } from './aiService.js';
 import { sendPushNotification, broadcastEvent } from './pushService.js';
 
 // Setup Nodemailer transporter if SMTP config provided
@@ -66,20 +67,31 @@ export async function processInboundEmail(payload) {
     }
   }
 
-  // Determine category
-  let category = 'general';
-  if (aliasName === 'shopping' || aliasName === 'etall' || aliasName === 'order' || aliasName === 'receipts' || aliasName === 'bills') {
-    category = 'shopping';
-  } else if (aliasName === 'us' || aliasName === 'love' || aliasName === 'surat' || aliasName === 'secret') {
-    category = 'love';
-  } else if (aliasName === 'acell' || aliasName === 'acel' || aliasName === 'haikal') {
-    category = 'personal';
+  // AI Analysis (OhhMyAgent / GPT-5.6 / Local Fallback)
+  let aiAnalysis = null;
+  try {
+    aiAnalysis = await analyzeEmailWithAI({
+      from: fromAddress,
+      fromName: fromName || fromAddress,
+      to: toAddress,
+      subject,
+      text: textBody,
+      html: htmlBody
+    });
+  } catch (aiErr) {
+    console.warn('⚠️ AI analysis error, continuing:', aiErr.message);
   }
 
-  // If sender or content is obvious e-commerce, set category to shopping
-  const lowerFrom = (fromAddress + ' ' + fromName).toLowerCase();
-  if (/shopee|tokopedia|tiktok|lazada|blibli|zalora|apple/i.test(lowerFrom)) {
-    category = 'shopping';
+  // Use AI category if available, or fallback to alias rules
+  let category = aiAnalysis?.category || 'general';
+  if (!aiAnalysis) {
+    if (aliasName === 'shopping' || aliasName === 'etall' || aliasName === 'order' || aliasName === 'receipts' || aliasName === 'bills') {
+      category = 'shopping';
+    } else if (aliasName === 'us' || aliasName === 'love' || aliasName === 'surat' || aliasName === 'secret') {
+      category = 'love';
+    } else if (aliasName === 'acell' || aliasName === 'acel') {
+      category = 'personal';
+    }
   }
 
   const emailId = `mail_${Date.now()}_${uuidv4().slice(0, 8)}`;
@@ -89,8 +101,8 @@ export async function processInboundEmail(payload) {
     INSERT INTO emails (
       id, message_id, from_address, from_name, to_address, alias_name, 
       subject, text_body, html_body, category, is_read_by_boy, is_read_by_girl,
-      attachments_json, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, datetime('now'))
+      attachments_json, ai_summary, ai_sentiment, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, datetime('now'))
   `, [
     emailId,
     messageId,
@@ -102,11 +114,13 @@ export async function processInboundEmail(payload) {
     textBody,
     htmlBody || `<p>${textBody}</p>`,
     category,
-    JSON.stringify(attachments)
+    JSON.stringify(attachments),
+    aiAnalysis?.summary || null,
+    aiAnalysis?.sentiment || 'neutral'
   ]);
 
-  // Check if shopping receipt
-  const receiptData = parseReceiptEmail({
+  // Check if shopping receipt from AI or local parser
+  const orderData = aiAnalysis?.order || parseReceiptEmail({
     subject,
     textBody,
     htmlBody,
@@ -117,44 +131,82 @@ export async function processInboundEmail(payload) {
   });
 
   let shoppingRecord = null;
-  if (receiptData) {
+  if (orderData && (orderData.tracking_number || orderData.trackingNumber || orderData.item_title || orderData.itemTitle)) {
     const shopItemId = `shop_${Date.now()}_${uuidv4().slice(0, 6)}`;
+    const platform = orderData.platform || 'Online Store';
+    const courier = orderData.courier || 'Kurir Standar';
+    const trackingNumber = orderData.tracking_number || orderData.trackingNumber || 'Belum Ada Resi';
+    const itemTitle = orderData.item_title || orderData.itemTitle || 'Paket Belanjaan';
+    const totalPrice = orderData.total_price || orderData.totalPrice || 0;
+    const status = orderData.status || 'shipping';
+    const estimatedDelivery = orderData.estimated_delivery || orderData.estimatedDelivery || '1-3 Hari';
+    const originCity = orderData.origin_city || 'Jakarta';
+    const destinationCity = orderData.destination_city || 'Bandung';
+    const timelineJson = JSON.stringify(orderData.timeline || []);
+    const coordinatesJson = JSON.stringify(orderData.coordinates || {});
+    const aiSummary = aiAnalysis?.summary || `Paket ${platform} dikirim via ${courier}`;
+    const trackingUrl = orderData.tracking_url || getCourierTrackingUrl(courier, trackingNumber);
+
     await run(`
       INSERT INTO shopping_items (
         id, email_id, platform, order_id, tracking_number, courier,
         item_title, item_image, total_price, currency, status,
-        estimated_delivery, notes, buyer_name, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        estimated_delivery, origin_city, destination_city, timeline_json,
+        coordinates_json, ai_summary, tracking_url, notes, buyer_name,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `, [
       shopItemId,
       emailId,
-      receiptData.platform,
-      receiptData.orderId,
-      receiptData.trackingNumber,
-      receiptData.courier,
-      receiptData.itemTitle,
-      receiptData.itemImage,
-      receiptData.totalPrice,
-      receiptData.currency,
-      receiptData.status,
-      receiptData.estimated_delivery,
-      receiptData.notes,
-      receiptData.buyer_name
+      platform,
+      orderData.order_id || orderData.orderId || `#${Date.now().toString().slice(-6)}`,
+      trackingNumber,
+      courier,
+      itemTitle,
+      orderData.item_image || orderData.itemImage || null,
+      totalPrice,
+      'IDR',
+      status,
+      estimatedDelivery,
+      originCity,
+      destinationCity,
+      timelineJson,
+      coordinatesJson,
+      aiSummary,
+      trackingUrl,
+      orderData.notes || '',
+      orderData.buyer_name || 'Acell & Haikal'
     ]);
 
-    shoppingRecord = { id: shopItemId, ...receiptData, emailId };
+    shoppingRecord = {
+      id: shopItemId,
+      emailId,
+      platform,
+      courier,
+      trackingNumber,
+      itemTitle,
+      totalPrice,
+      status,
+      estimatedDelivery,
+      originCity,
+      destinationCity,
+      timeline: orderData.timeline || [],
+      coordinates: orderData.coordinates || {},
+      aiSummary,
+      trackingUrl
+    };
 
     // Send push notification for Shopping
     await sendPushNotification({
-      title: `🛍️ Paket Baru: ${receiptData.platform}`,
-      body: `${receiptData.itemTitle} (${receiptData.courier} - ${receiptData.trackingNumber})`,
+      title: `🛍️ Paket ${platform}: ${courier}`,
+      body: `${itemTitle} (Resi: ${trackingNumber})`,
       data: { type: 'shopping', id: shopItemId, emailId }
     });
   } else if (category === 'love') {
     // Send push notification for Love Letter
     await sendPushNotification({
-      title: `💌 Surat Masuk di love@${config.activeDomain}!`,
-      body: `${fromName || fromAddress}: "${subject}" 💖`,
+      title: `💌 Surat Cinta Masuk!`,
+      body: `${fromName || fromAddress}: "${subject}" 💙`,
       data: { type: 'love_mail', emailId }
     });
   } else {

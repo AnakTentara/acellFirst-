@@ -26,20 +26,20 @@ Dokumentasi ini dirancang agar kamu (Haikal) atau siapa pun yang mengembangkan c
       "id": "user_haikal",
       "username": "haikal",
       "display_name": "Haikal",
-      "nickname": "My Boy 💙",
+      "nickname": "Prince 👑",
       "role": "boy",
       "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-      "mood": "💖 Lagi kangen kamu",
+      "mood": "💙 Lagi kangen kamu",
       "battery_level": 100
     },
     {
       "id": "user_acell",
       "username": "acell",
       "display_name": "Acell",
-      "nickname": "My Girl 💖",
+      "nickname": "Princess 👑",
       "role": "girl",
       "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-      "mood": "✨ Semangat hari ini!",
+      "mood": "🌌 Semangat hari ini!",
       "battery_level": 100
     }
   ]
@@ -251,3 +251,59 @@ Dokumentasi ini dirancang agar kamu (Haikal) atau siapa pun yang mengembangkan c
   * `outbound_email_sent`: Saat ada email yang berhasil dikirim.
   * `profile_updated`: Saat mood atau baterai cinta diubah pasangan.
   * `domain_switch`: Saat domain sistem dialihkan.
+
+---
+
+## 7. 🧠 AI Intelligence & OhhMyAgent Integration
+
+Ekosistem Sanctuary didukung oleh model AI **`ohh/gpt-5.6`** via [OhhMyAgent.com](https://ohhmyagent.com/docs) atau OpenAI untuk parsing receipt e-commerce dan email intelligence.
+
+### 7.1 Uji AI Analisis Email Masuk
+* **Endpoint:** `POST /api/mail/test-ai`
+* **Payload:**
+```json
+{
+  "subject": "Pesanan Shopee Kamu Sedang Dikirim! [SPXID048192841]",
+  "text": "Pesanan Tumblr Biru & Skincare telah diserahkan ke SPX Express. Resi: SPXID048192841. Total: Rp 285.000."
+}
+```
+* **Contoh Response `200 OK`:**
+```json
+{
+  "success": true,
+  "modelUsed": "ohh/gpt-5.6",
+  "hasApiKey": true,
+  "result": {
+    "is_order_receipt": true,
+    "category": "shopping",
+    "summary": "Pesanan Shopee berupa tumbler biru dan skincare sedang dalam perjalanan via SPX Express.",
+    "sentiment": "happy",
+    "order": {
+      "platform": "Shopee",
+      "courier": "SPX Express",
+      "tracking_number": "SPXID048192841",
+      "item_title": "Tumblr Biru & Skincare",
+      "total_price": 285000,
+      "currency": "IDR",
+      "status": "shipping",
+      "estimated_delivery": "18 Agustus 2026",
+      "origin_city": "Jakarta Barat",
+      "destination_city": "Bandung",
+      "coordinates": {
+        "origin": { "lat": -6.1683, "lng": 106.7588, "name": "Jakarta Barat (Sorting Center)" },
+        "current": { "lat": -6.6178, "lng": 106.9004, "name": "Dalam Perjalanan Menuju Bandung" },
+        "destination": { "lat": -6.9175, "lng": 107.6191, "name": "Bandung (Alamat Acell & Haikal)" }
+      },
+      "timeline": [
+        { "step": 1, "title": "Pesanan Terkonfirmasi", "completed": true },
+        { "step": 2, "title": "Diproses Penjual", "completed": true },
+        { "step": 3, "title": "Diserahkan ke SPX Express", "completed": true, "current": true },
+        { "step": 4, "title": "Menuju Alamat Tujuan", "completed": false },
+        { "step": 5, "title": "Paket Diterima", "completed": false }
+      ],
+      "tracking_url": "https://spx.co.id/track?trackingNumber=SPXID048192841"
+    }
+  }
+}
+```
+

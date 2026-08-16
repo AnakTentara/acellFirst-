@@ -25,7 +25,7 @@ export default function SettingsModal({
   systemConfig,
   onDomainUpdated
 }) {
-  const [activeTab, setActiveTab] = useState('domain'); // 'domain', 'smtp', 'apidocs'
+  const [activeTab, setActiveTab] = useState('domain'); // 'domain', 'smtp', 'ai', 'apidocs'
   const [activeDomainInput, setActiveDomainInput] = useState(systemConfig?.activeDomain || 'acellimut.my.id');
   const [dnsGuide, setDnsGuide] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
@@ -42,6 +42,15 @@ export default function SettingsModal({
   });
   const [smtpTesting, setSmtpTesting] = useState(false);
   const [smtpResult, setSmtpResult] = useState(null);
+
+  // AI & OhhMyAgent State
+  const [aiForm, setAiForm] = useState({
+    apiKey: '',
+    baseUrl: 'https://ohhmyagent.com/v1',
+    model: 'ohh/gpt-5.6'
+  });
+  const [aiTesting, setAiTesting] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
 
   // API Tester state
   const [apiEndpoint, setApiEndpoint] = useState('/api/love/counter');
@@ -103,6 +112,29 @@ export default function SettingsModal({
       setSmtpResult({ connected: false, message: err.message });
     } finally {
       setSmtpTesting(false);
+    }
+  };
+
+  const handleTestAi = async () => {
+    setAiTesting(true);
+    setAiResult(null);
+    try {
+      const res = await fetch('/api/mail/test-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: aiForm.apiKey,
+          baseUrl: aiForm.baseUrl,
+          model: aiForm.model
+        })
+      });
+      const data = await res.json();
+      setAiResult(data);
+      playClick();
+    } catch (err) {
+      setAiResult({ success: false, error: err.message });
+    } finally {
+      setAiTesting(false);
     }
   };
 
@@ -176,7 +208,7 @@ export default function SettingsModal({
                 Sistem & Pengaturan Acell Sanctuary
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Konfigurasi Domain, SMTP Outbound, dan Dokumentasi API Terintegrasi
+                Konfigurasi Domain, SMTP Outbound, AI OhhMyAgent, dan API Tester
               </p>
             </div>
           </div>
@@ -191,7 +223,7 @@ export default function SettingsModal({
         </div>
 
         {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid rgba(219, 234, 254, 0.6)', paddingBottom: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid rgba(219, 234, 254, 0.6)', paddingBottom: '10px', overflowX: 'auto' }}>
           <button
             onClick={() => setActiveTab('domain')}
             className={`glass-pill ${activeTab === 'domain' ? 'active' : ''}`}
@@ -207,6 +239,14 @@ export default function SettingsModal({
           >
             <Mail size={14} />
             SMTP Outbound Mail
+          </button>
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`glass-pill ${activeTab === 'ai' ? 'active' : ''}`}
+            style={{ fontSize: '0.82rem', padding: '6px 14px', background: activeTab === 'ai' ? '#2563eb' : 'transparent', color: activeTab === 'ai' ? '#fff' : 'inherit' }}
+          >
+            <Zap size={14} />
+            AI & OhhMyAgent
           </button>
           <button
             onClick={() => setActiveTab('apidocs')}
@@ -435,7 +475,117 @@ export default function SettingsModal({
           </div>
         )}
 
-        {/* TAB 3: API DOCUMENTATION & TESTER */}
+        {/* TAB 3: AI INTELLIGENCE & OHHMYAGENT */}
+        {activeTab === 'ai' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="glass-card" style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.95)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                    AI Email & Courier Intelligence
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Powered by <b>OhhMyAgent.com</b> (Model: <code>ohh/gpt-5.6</code>) / OpenAI
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px', fontSize: '0.8rem', color: '#166534', marginBottom: '16px' }}>
+                ✨ <b>Fitur Cerdas Aktif:</b> AI menganalisis otomatis setiap email masuk ke <code>shopping@</code>, <code>etall@</code>, atau <code>us@</code> untuk mengekstrak ekspedisi (SPX, JNE, J&T, SiCepat, Lion Parcel), nomor resi, total harga, estimasi tiba, serta koordinat radar peta pengiriman!
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    OhhMyAgent / OpenAI API Key (<code>sk-mvx-...</code> atau <code>sk-...</code>)
+                  </label>
+                  <input
+                    type="password"
+                    value={aiForm.apiKey}
+                    onChange={(e) => setAiForm({ ...aiForm, apiKey: e.target.value })}
+                    placeholder="sk-mvx-your-api-key"
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    * Jika dikosongkan, sistem tetap berjalan normal menggunakan Heuristic Regex Courier Parser lokal.
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                      AI Base URL
+                    </label>
+                    <input
+                      type="text"
+                      value={aiForm.baseUrl}
+                      onChange={(e) => setAiForm({ ...aiForm, baseUrl: e.target.value })}
+                      placeholder="https://ohhmyagent.com/v1"
+                      className="glass-input"
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                      AI Model
+                    </label>
+                    <input
+                      type="text"
+                      value={aiForm.model}
+                      onChange={(e) => setAiForm({ ...aiForm, model: e.target.value })}
+                      placeholder="ohh/gpt-5.6"
+                      className="glass-input"
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleTestAi}
+                  disabled={aiTesting}
+                  className="glass-btn glass-btn-primary"
+                  style={{ padding: '10px 18px', fontSize: '0.85rem', marginTop: '4px' }}
+                >
+                  <Zap size={14} />
+                  {aiTesting ? 'AI Sedang Menganalisis...' : '⚡ Uji AI Analisis Resi (OhhMyAgent / GPT-5.6)'}
+                </button>
+              </div>
+
+              {/* AI Test Result Display */}
+              {aiResult && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  background: aiResult.success ? '#f8fafc' : '#fef2f2',
+                  border: `1px solid ${aiResult.success ? '#cbd5e1' : '#fecaca'}`,
+                  color: '#0f172a'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 800, color: '#2563eb' }}>
+                      Hasil Analisis AI ({aiResult.modelUsed || 'Heuristic Fallback'}):
+                    </span>
+                    <span style={{ fontSize: '0.7rem', background: '#eff6ff', color: '#1e40af', padding: '2px 6px', borderRadius: '4px' }}>
+                      {aiResult.hasApiKey ? 'API Key Terpasang' : 'Local Fallback Mode'}
+                    </span>
+                  </div>
+                  <pre style={{ margin: 0, padding: '10px', background: '#0f172a', color: '#38bdf8', borderRadius: '8px', overflowX: 'auto', fontSize: '0.75rem' }}>
+                    {JSON.stringify(aiResult.result, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: API DOCUMENTATION & TESTER */}
         {activeTab === 'apidocs' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="glass-card" style={{ padding: '16px', background: 'rgba(255, 255, 255, 0.9)' }}>

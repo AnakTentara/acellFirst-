@@ -124,6 +124,8 @@ export const initDatabase = async () => {
       is_outbound INTEGER DEFAULT 0,
       is_draft INTEGER DEFAULT 0,
       attachments_json TEXT DEFAULT '[]',
+      ai_summary TEXT,
+      ai_sentiment TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -131,6 +133,8 @@ export const initDatabase = async () => {
   // Migrations for existing DB files
   try { await run(`ALTER TABLE emails ADD COLUMN is_outbound INTEGER DEFAULT 0`); } catch (e) {}
   try { await run(`ALTER TABLE emails ADD COLUMN is_draft INTEGER DEFAULT 0`); } catch (e) {}
+  try { await run(`ALTER TABLE emails ADD COLUMN ai_summary TEXT`); } catch (e) {}
+  try { await run(`ALTER TABLE emails ADD COLUMN ai_sentiment TEXT`); } catch (e) {}
 
   // 3. Shopping Items Table
   await run(`
@@ -147,12 +151,25 @@ export const initDatabase = async () => {
       currency TEXT DEFAULT 'IDR',
       status TEXT DEFAULT 'processing',
       estimated_delivery TEXT,
+      origin_city TEXT,
+      destination_city TEXT,
+      timeline_json TEXT DEFAULT '[]',
+      coordinates_json TEXT DEFAULT '{}',
+      ai_summary TEXT,
+      tracking_url TEXT,
       notes TEXT,
       buyer_name TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  try { await run(`ALTER TABLE shopping_items ADD COLUMN origin_city TEXT`); } catch (e) {}
+  try { await run(`ALTER TABLE shopping_items ADD COLUMN destination_city TEXT`); } catch (e) {}
+  try { await run(`ALTER TABLE shopping_items ADD COLUMN timeline_json TEXT DEFAULT '[]'`); } catch (e) {}
+  try { await run(`ALTER TABLE shopping_items ADD COLUMN coordinates_json TEXT DEFAULT '{}'`); } catch (e) {}
+  try { await run(`ALTER TABLE shopping_items ADD COLUMN ai_summary TEXT`); } catch (e) {}
+  try { await run(`ALTER TABLE shopping_items ADD COLUMN tracking_url TEXT`); } catch (e) {}
 
   // 4. Love Letters Table
   await run(`

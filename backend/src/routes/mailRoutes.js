@@ -251,3 +251,36 @@ mailRouter.post('/simulate-test', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// 9. Test OhhMyAgent / GPT-5.6 AI Analysis
+mailRouter.post('/test-ai', async (req, res) => {
+  try {
+    const { from, fromName, to, subject, text, apiKey, baseUrl, model } = req.body;
+    
+    // Temporarily set env if provided in request
+    if (apiKey) process.env.AI_API_KEY = apiKey;
+    if (baseUrl) process.env.AI_BASE_URL = baseUrl;
+    if (model) process.env.AI_MODEL = model;
+
+    const { analyzeEmailWithAI } = await import('../services/aiService.js');
+    const domain = (await getOne(`SELECT value FROM system_settings WHERE key = 'active_domain'`))?.value || config.activeDomain;
+
+    const sampleEmail = {
+      from: from || 'order-update@spx.co.id',
+      fromName: fromName || 'Shopee Express (SPX)',
+      to: to || `shopping@${domain}`,
+      subject: subject || 'Paket Shopee Kamu Sedang Dikirim! [SPXID048192841]',
+      text: text || 'Pesanan Korean Aesthetic Thermal Tumbler telah diserahkan ke kurir SPX Express. Resi: SPXID048192841. Total: Rp 285.000. Estimasi sampai: 18 Agustus 2026.'
+    };
+
+    const aiResult = await analyzeEmailWithAI(sampleEmail);
+    res.json({
+      success: true,
+      modelUsed: process.env.AI_MODEL || 'ohh/gpt-5.6',
+      hasApiKey: Boolean(process.env.AI_API_KEY),
+      result: aiResult
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
