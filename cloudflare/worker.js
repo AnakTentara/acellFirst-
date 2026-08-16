@@ -8,7 +8,7 @@
 export default {
   async email(message, env, ctx) {
     const webhookUrl = env.WEBHOOK_URL || "https://acellimut.haikaldev.my.id/api/mail/inbound";
-    const webhookSecret = env.WEBHOOK_SECRET || "couple_secret_token_123";
+    const webhookSecret = env.WEBHOOK_SECRET || "Senin23062025";
 
     try {
       // Read raw email body as text/MIME

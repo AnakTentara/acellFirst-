@@ -171,22 +171,25 @@ export const initDatabase = async () => {
     ]);
   }
 
-  const girlUser = await getOne(`SELECT * FROM users WHERE username = ?`, ['acel']);
+  const girlUser = await getOne(`SELECT * FROM users WHERE username = ? OR username = ?`, ['acell', 'acel']);
   if (!girlUser) {
-    const pinHashAcel = await bcrypt.hash('123456', 10);
+    const pinHashAcell = await bcrypt.hash('123456', 10);
     await run(`
       INSERT INTO users (id, username, display_name, nickname, role, avatar, pin_hash, mood)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      'user_acel',
-      'acel',
-      config.girlName,
-      config.girlNickname,
+      'user_acell',
+      'acell',
+      config.girlName || 'Acell',
+      config.girlNickname || 'My Girl 💖',
       'girl',
       'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-      pinHashAcel,
+      pinHashAcell,
       '✨ Semangat hari ini!'
     ]);
+  } else {
+    // Ensure display_name is updated to Acell
+    await run(`UPDATE users SET display_name = 'Acell', username = 'acell' WHERE role = 'girl'`);
   }
 
   // Seed sample initial emails & receipts if database is fresh

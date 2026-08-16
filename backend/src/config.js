@@ -12,15 +12,15 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  jwtSecret: process.env.JWT_SECRET || 'couple_super_secret_jwt_key_2026',
-  webhookSecret: process.env.WEBHOOK_SECRET || 'couple_secret_token_123',
+  jwtSecret: process.env.JWT_SECRET || 'Senin23062025',
+  webhookSecret: process.env.WEBHOOK_SECRET || 'Senin23062025',
 
   // Couple Profile
   boyName: process.env.BOY_NAME || 'Haikal',
   boyNickname: process.env.BOY_NICKNAME || 'My Boy 💙',
-  girlName: process.env.GIRL_NAME || 'Acel',
+  girlName: process.env.GIRL_NAME || 'Acell',
   girlNickname: process.env.GIRL_NICKNAME || 'My Girl 💖',
-  anniversaryDate: process.env.ANNIVERSARY_DATE || '2023-10-14', // Default anniversary
+  anniversaryDate: process.env.ANNIVERSARY_DATE || '2025-06-23', // 23 Juni 2025
 
   // Dynamic Domain System
   activeDomain: process.env.ACTIVE_DOMAIN || 'acellimut.haikaldev.my.id',
