@@ -4,9 +4,10 @@ import {
   ShoppingBag, 
   Heart, 
   Sparkles, 
-  Settings, 
   Send, 
-  Tag
+  Tag,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { playClick } from '../utils/sound';
 
@@ -14,7 +15,9 @@ export default function Sidebar({
   activeTab,
   onSelectTab,
   onOpenCompose,
-  unreadStats
+  unreadStats,
+  isCollapsed,
+  onToggleCollapse
 }) {
   const navItems = [
     {
@@ -44,18 +47,50 @@ export default function Sidebar({
       icon: Sparkles,
       badge: null,
       color: '#0ea5e9'
-    },
-    {
-      id: 'settings',
-      label: 'Domain & SMTP',
-      icon: Settings,
-      badge: null,
-      color: '#1d4ed8'
     }
   ];
 
   return (
-    <aside className="glass-panel" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', height: 'fit-content' }}>
+    <aside className="glass-panel" style={{
+      padding: isCollapsed ? '12px 8px' : '14px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '14px',
+      height: 'fit-content',
+      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+      alignItems: isCollapsed ? 'center' : 'stretch'
+    }}>
+      {/* Header with Collapse Toggle */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: isCollapsed ? 'center' : 'space-between',
+        paddingBottom: '4px'
+      }}>
+        {!isCollapsed && (
+          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Menu Utama
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            playClick();
+            onToggleCollapse();
+          }}
+          className="glass-btn"
+          style={{
+            padding: '6px',
+            borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.6)',
+            color: 'var(--text-secondary)'
+          }}
+          title={isCollapsed ? 'Buka Sidebar' : 'Tutup Sidebar'}
+        >
+          {isCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
+      </div>
+
       {/* Compose Mail Button */}
       <button 
         onClick={() => {
@@ -63,14 +98,24 @@ export default function Sidebar({
           onOpenCompose();
         }}
         className="glass-btn glass-btn-primary" 
-        style={{ width: '100%', padding: '11px 16px', fontSize: '0.9rem', borderRadius: '14px' }}
+        style={{
+          width: '100%',
+          padding: isCollapsed ? '10px 0' : '11px 16px',
+          fontSize: '0.9rem',
+          borderRadius: '14px',
+          justifyContent: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+        title="Tulis Pesan / Surat"
       >
         <Send size={16} />
-        <span>Tulis Pesan / Surat</span>
+        {!isCollapsed && <span>Tulis Surat</span>}
       </button>
 
       {/* Navigation List */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -82,11 +127,12 @@ export default function Sidebar({
                 playClick();
                 onSelectTab(item.id);
               }}
+              title={isCollapsed ? item.label : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '9px 12px',
+                justifyContent: isCollapsed ? 'center' : 'space-between',
+                padding: isCollapsed ? '10px 0' : '9px 12px',
                 borderRadius: '12px',
                 border: '1px solid',
                 borderColor: isActive ? 'rgba(37, 99, 235, 0.3)' : 'transparent',
@@ -98,7 +144,8 @@ export default function Sidebar({
                 fontSize: '0.86rem',
                 cursor: 'pointer',
                 transition: 'all 0.18s ease',
-                boxShadow: isActive ? '0 4px 14px rgba(37, 99, 235, 0.1)' : 'none'
+                boxShadow: isActive ? '0 4px 14px rgba(37, 99, 235, 0.1)' : 'none',
+                position: 'relative'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -114,7 +161,7 @@ export default function Sidebar({
                 }}>
                   <Icon size={16} />
                 </div>
-                <span>{item.label}</span>
+                {!isCollapsed && <span>{item.label}</span>}
               </div>
 
               {item.badge ? (
@@ -123,8 +170,11 @@ export default function Sidebar({
                   color: '#fff',
                   fontSize: '0.68rem',
                   fontWeight: 800,
-                  padding: '1px 7px',
-                  borderRadius: '999px'
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  position: isCollapsed ? 'absolute' : 'static',
+                  top: isCollapsed ? '4px' : 'auto',
+                  right: isCollapsed ? '4px' : 'auto'
                 }}>
                   {item.badge}
                 </span>
@@ -134,20 +184,22 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Aliases List Info */}
-      <div style={{ padding: '6px 8px', fontSize: '0.74rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(219, 234, 254, 0.5)', paddingTop: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontWeight: 700, color: 'var(--text-secondary)' }}>
-          <Tag size={12} />
-          <span>Alias Email Resmi:</span>
+      {/* Aliases List Info (Visible when expanded) */}
+      {!isCollapsed && (
+        <div style={{ padding: '6px 8px', fontSize: '0.74rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(219, 234, 254, 0.5)', paddingTop: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+            <Tag size={12} />
+            <span>Alias Email Resmi:</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {['us@', 'shopping@', 'etall@', 'acell@'].map(a => (
+              <span key={a} style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
+                {a}
+              </span>
+            ))}
+          </div>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {['us@', 'shopping@', 'etall@', 'acell@'].map(a => (
-            <span key={a} style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
-              {a}
-            </span>
-          ))}
-        </div>
-      </div>
+      )}
     </aside>
   );
 }

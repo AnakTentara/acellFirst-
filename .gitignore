@@ -19,6 +19,5 @@ backend/data/uploads/*
 
 # Build outputs
 dist/
-frontend/dist/
 .DS_Store
 *.log

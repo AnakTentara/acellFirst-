@@ -27,6 +27,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -292,7 +293,7 @@ export default function App() {
       />
 
       {/* Main Grid: Sidebar + Viewport */}
-      <main className="main-content">
+      <main className={`main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <Sidebar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
@@ -302,7 +303,8 @@ export default function App() {
             unreadLove: mailStats?.unreadLove || 0,
             activePackages: shoppingStats?.activePackages || 0
           }}
-          onSimulateMail={handleSimulateMail}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
 
         <section style={{ height: '100%' }}>
