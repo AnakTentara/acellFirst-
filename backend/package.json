@@ -1,7 +1,7 @@
 {
   "name": "couple-ecosystem-backend",
   "version": "1.0.0",
-  "description": "Backend API, Mail Ingestion & Receipt Parser for Acel & Haikal Ecosystem",
+  "description": "Backend API, Mail Ingestion & Receipt Parser for Acell & Haikal Ecosystem",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -17,7 +17,6 @@
     "mailparser": "^3.7.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.10.0",
-    "sqlite3": "^5.1.7",
     "uuid": "^11.1.0"
   }
 }

@@ -35,8 +35,9 @@ EOT
 fi
 
 # 3. Cek dependensi backend
-if [ ! -d "backend/node_modules" ]; then
-  echo "📦 Menginstall dependencies backend..."
+if [ ! -d "backend/node_modules" ] || [ -d "backend/node_modules/sqlite3" ]; then
+  echo "📦 Menyesuaikan dependencies backend (Zero C++ bindings mode)..."
+  rm -rf backend/node_modules/sqlite3 2>/dev/null || true
   cd backend && npm install --omit=dev && cd ..
 fi
 
