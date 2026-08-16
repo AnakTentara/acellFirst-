@@ -24,6 +24,7 @@ import confetti from 'canvas-confetti';
 export default function App() {
   // Navigation & UI States
   const [activeTab, setActiveTab] = useState('inbox');
+  const [activeMailFolder, setActiveMailFolder] = useState('inbox');
   const [showSettings, setShowSettings] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -50,107 +51,70 @@ export default function App() {
   const [wishlistItems, setWishlistItems] = useState([]);
   const [wishlistStats, setWishlistStats] = useState({});
 
-  // Show floating toast
-  const showToast = (title, message, type = 'info') => {
-    setToast({ title, message, type });
+  const showToast = (title, message) => {
+    setToast({ title, message });
     setTimeout(() => setToast(null), 4000);
   };
 
-  // 1. Initial Load
   useEffect(() => {
     loadInitialData();
-  }, []);
 
-  // 2. Real-time SSE Subscription
-  useEffect(() => {
-    const unsubscribe = subscribeToEvents((eventType, data) => {
-      console.log('⚡ Live Event Received:', eventType, data);
-
-      if (eventType === 'new_email') {
+    // Subscribe to SSE
+    const unsubscribe = subscribeToEvents((event, data) => {
+      if (event === 'new_email') {
         playChime();
+        showToast('📬 Email Baru Masuk!', `${data.email?.subject} (${data.email?.from_name || data.email?.from_address})`);
         loadEmails();
         loadShopping();
-        showToast('📬 Email Baru Masuk!', `${data.email?.from_name || data.email?.from_address}: ${data.email?.subject}`);
-      } else if (eventType === 'new_love_letter') {
-        playChime();
-        try {
-          confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-        } catch (e) {}
+      } else if (event === 'mail_read_update' || event === 'mail_trash' || event === 'mail_restore' || event === 'mail_deleted') {
+        if (data?.stats) setMailStats(data.stats);
+        loadEmails();
+      } else if (event === 'love_letter_received') {
+        playHeartPop();
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
+        showToast('💌 Surat Cinta!', `${data.letter?.sender_name} mengirimkan surat baru 💙`);
         loadLoveLetters();
-        showToast('💌 Surat Cinta Baru!', `Ada surat romantis baru yang masuk ✨`);
-      } else if (eventType === 'shopping_update' || eventType === 'shopping_deleted') {
+      } else if (event === 'shopping_update') {
         loadShopping();
-      } else if (eventType === 'wishlist_update' || eventType === 'wishlist_deleted') {
-        loadWishlist();
-      } else if (eventType === 'domain_switch') {
-        setActiveDomain(data.activeDomain);
-        showToast('🌐 Domain Berganti', `Domain aktif sekarang: ${data.activeDomain}`);
-      } else if (eventType === 'profile_update') {
-        loadProfiles();
       }
     }, (connected) => {
       setIsLiveConnected(connected);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const loadInitialData = async () => {
-    try {
-      await Promise.all([
-        loadProfiles(),
-        loadSystemConfig(),
-        loadCounter(),
-        loadEmails(),
-        loadShopping(),
-        loadLoveLetters(),
-        loadWishlist()
-      ]);
-    } catch (err) {
-      console.error('Error loading initial data:', err);
-    }
+    await Promise.all([
+      loadProfiles(),
+      loadEmails(),
+      loadShopping(),
+      loadLoveLetters(),
+      loadWishlist(),
+      loadSystemConfig()
+    ]);
   };
 
   const loadProfiles = async () => {
     try {
       const res = await authApi.getProfiles();
-      if (res.success && res.users.length > 0) {
-        setProfiles(res.users);
-        if (!currentUser) {
-          // Default to Haikal or stored preference
-          const savedId = localStorage.getItem('acel_user_id');
-          const found = res.users.find(u => u.id === savedId) || res.users[0];
-          setCurrentUser(found);
-        } else {
-          const updated = res.users.find(u => u.id === currentUser.id);
-          if (updated) setCurrentUser(updated);
+      if (res.success && res.profiles) {
+        setProfiles(res.profiles);
+        // Default to Haikal or Acell
+        if (!currentUser && res.profiles.length > 0) {
+          const boy = res.profiles.find(p => p.role === 'boy') || res.profiles[0];
+          setCurrentUser(boy);
         }
       }
     } catch (e) {}
   };
 
-  const loadSystemConfig = async () => {
+  const loadEmails = async (folderOverride) => {
     try {
-      const res = await systemApi.getConfig();
-      if (res.success) {
-        setSystemConfig(res.config);
-        setActiveDomain(res.config.activeDomain);
-      }
-    } catch (e) {}
-  };
-
-  const loadCounter = async () => {
-    try {
-      const res = await loveApi.getCounter();
-      if (res.success) {
-        setDaysTogether(res.togetherString);
-      }
-    } catch (e) {}
-  };
-
-  const loadEmails = async () => {
-    try {
-      const res = await mailApi.getInbox();
+      const folder = folderOverride || activeMailFolder || 'inbox';
+      const res = await mailApi.getInbox({ folder });
       if (res.success) {
         setEmails(res.emails);
         setMailStats(res.stats);
@@ -158,16 +122,78 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleSelectMailFolder = (folder) => {
+    setActiveMailFolder(folder);
+    setSelectedEmail(null);
+    setEmailShoppingItem(null);
+    loadEmails(folder);
+  };
+
   const handleSelectEmail = async (mail) => {
     setSelectedEmail(mail);
+    
+    // 1. Optimistically reduce unread count in frontend state immediately
+    setEmails(prev => prev.map(m => m.id === mail.id ? { ...m, is_read_by_boy: 1, is_read_by_girl: 1 } : m));
+    setMailStats(prev => ({
+      ...prev,
+      unreadTotal: Math.max(0, (prev.unreadTotal || 1) - 1),
+      unreadShopping: mail.category === 'shopping' ? Math.max(0, (prev.unreadShopping || 1) - 1) : prev.unreadShopping,
+      unreadLove: mail.category === 'love' ? Math.max(0, (prev.unreadLove || 1) - 1) : prev.unreadLove
+    }));
+
     try {
       const detail = await mailApi.getMail(mail.id);
       if (detail.success) {
         setEmailShoppingItem(detail.shoppingItem || null);
       }
-      // Mark as read
-      await mailApi.markRead(mail.id, currentUser?.role || 'boy');
+      // 2. Mark as read on backend and sync exact stats
+      const readRes = await mailApi.markRead(mail.id, currentUser?.role || 'boy');
+      if (readRes?.stats) {
+        setMailStats(readRes.stats);
+      }
     } catch (e) {}
+  };
+
+  const handleToggleStar = async (id) => {
+    const res = await mailApi.toggleStar(id);
+    if (res?.stats) setMailStats(res.stats);
+    loadEmails();
+  };
+
+  const handleMoveToTrash = async (id) => {
+    const res = await mailApi.moveToTrash(id);
+    setSelectedEmail(null);
+    setEmailShoppingItem(null);
+    if (res?.stats) setMailStats(res.stats);
+    loadEmails();
+    showToast('🗑️ Email Dibuang', 'Pesan dipindahkan ke Sampah.');
+  };
+
+  const handleRestoreMail = async (id) => {
+    const res = await mailApi.restoreMail(id);
+    setSelectedEmail(null);
+    setEmailShoppingItem(null);
+    if (res?.stats) setMailStats(res.stats);
+    loadEmails();
+    showToast('♻️ Email Dipulihkan', 'Pesan dikembalikan ke Kotak Masuk.');
+  };
+
+  const handleMarkSpam = async (id) => {
+    const res = await mailApi.markSpam(id);
+    setSelectedEmail(null);
+    setEmailShoppingItem(null);
+    if (res?.stats) setMailStats(res.stats);
+    loadEmails();
+    showToast('🚫 Ditandai Spam', 'Pesan dipindahkan ke Spam.');
+  };
+
+  const handlePermanentDelete = async (id) => {
+    const res = await mailApi.deleteMail(id);
+    setSelectedEmail(null);
+    setEmailShoppingItem(null);
+    if (res?.stats) setMailStats(res.stats);
+    loadEmails();
+    showToast('💥 Email Terhapus', 'Pesan dihapus permanen.');
   };
 
   const loadShopping = async () => {
@@ -209,18 +235,6 @@ export default function App() {
     } catch (err) {
       alert('Gagal simulasi: ' + err.message);
     }
-  };
-
-  const handleToggleStar = async (id) => {
-    await mailApi.toggleStar(id);
-    loadEmails();
-  };
-
-  const handleDeleteMail = async (id) => {
-    await mailApi.deleteMail(id);
-    setSelectedEmail(null);
-    setEmailShoppingItem(null);
-    loadEmails();
   };
 
   const handleSendMail = async (data) => {
@@ -294,12 +308,11 @@ export default function App() {
         <Sidebar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
+          activeMailFolder={activeMailFolder}
+          onSelectMailFolder={handleSelectMailFolder}
           onOpenCompose={() => setShowCompose(true)}
-          unreadStats={{
-            unreadShopping: mailStats?.unreadShopping || 0,
-            unreadLove: mailStats?.unreadLove || 0,
-            activePackages: shoppingStats?.activePackages || 0
-          }}
+          mailStats={mailStats}
+          shoppingStats={shoppingStats}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
@@ -309,10 +322,14 @@ export default function App() {
             <MailView
               emails={emails}
               selectedEmail={selectedEmail}
+              activeMailFolder={activeMailFolder}
               onSelectEmail={handleSelectEmail}
               onBackToList={() => setSelectedEmail(null)}
               onToggleStar={handleToggleStar}
-              onDeleteMail={handleDeleteMail}
+              onMoveToTrash={handleMoveToTrash}
+              onRestoreMail={handleRestoreMail}
+              onMarkSpam={handleMarkSpam}
+              onPermanentDelete={handlePermanentDelete}
               currentUser={currentUser}
               shoppingItem={emailShoppingItem}
             />

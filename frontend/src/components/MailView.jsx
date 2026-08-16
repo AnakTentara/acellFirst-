@@ -16,7 +16,8 @@ import {
   Inbox,
   Clock,
   Tag,
-  ShieldCheck,
+  AlertOctagon,
+  RotateCcw,
   Send
 } from 'lucide-react';
 import { playClick, playHeartPop } from '../utils/sound';
@@ -24,14 +25,17 @@ import { playClick, playHeartPop } from '../utils/sound';
 export default function MailView({
   emails,
   selectedEmail,
+  activeMailFolder,
   onSelectEmail,
   onBackToList,
   onToggleStar,
-  onDeleteMail,
+  onMoveToTrash,
+  onRestoreMail,
+  onMarkSpam,
+  onPermanentDelete,
   currentUser,
   shoppingItem
 }) {
-  const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedResi, setCopiedResi] = useState(false);
 
@@ -46,33 +50,15 @@ export default function MailView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedEmail, onBackToList]);
 
-  const categories = [
-    { id: 'all', label: 'Semua', icon: Inbox },
-    { id: 'shopping', label: '🛍️ Belanja & Resi', icon: ShoppingBag },
-    { id: 'love', label: '💌 Surat Cinta', icon: Heart },
-    { id: 'personal', label: '👤 Personal', icon: User },
-    { id: 'sent', label: '📤 Terkirim', icon: Mail },
-    { id: 'starred', label: '⭐ Berbintang', icon: Star }
-  ];
-
   const filteredEmails = emails.filter((mail) => {
-    // Category match
-    if (filterCategory === 'starred') {
-      if (mail.is_starred !== 1) return false;
-    } else if (filterCategory === 'sent') {
-      if (mail.is_outbound !== 1) return false;
-    } else if (filterCategory !== 'all') {
-      if (mail.is_outbound === 1) return false;
-      if (mail.category !== filterCategory) return false;
-    }
-
     // Search match
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       const matchSub = (mail.subject || '').toLowerCase().includes(term);
       const matchFrom = (mail.from_name || mail.from_address || '').toLowerCase().includes(term);
       const matchBody = (mail.text_body || '').toLowerCase().includes(term);
-      if (!matchSub && !matchFrom && !matchBody) return false;
+      const matchTag = (mail.ai_tags || []).some(t => t.toLowerCase().includes(term));
+      if (!matchSub && !matchFrom && !matchBody && !matchTag) return false;
     }
 
     return true;
@@ -106,6 +92,19 @@ export default function MailView({
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
   };
 
+  const getFolderTitle = () => {
+    switch (activeMailFolder) {
+      case 'starred': return '⭐ Berbintang';
+      case 'shopping': return '🛍️ Belanja & Resi';
+      case 'love': return '💌 Surat Cinta';
+      case 'personal': return '👤 Personal Acell & Haikal';
+      case 'sent': return '📤 Terkirim';
+      case 'trash': return '🗑️ Sampah';
+      case 'spam': return '🚫 Spam';
+      default: return '📥 Kotak Masuk';
+    }
+  };
+
   return (
     <div style={{ position: 'relative', width: '100%', minHeight: '600px', overflow: 'hidden' }}>
       {/* 1. LIST VIEW (Sliding out to the left when email is opened) */}
@@ -117,46 +116,26 @@ export default function MailView({
         animation: 'fadeIn 0.2s ease'
       }}>
         {/* Top Search & Filter Bar */}
-        <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: '1 1 260px' }}>
-              <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+        <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 280px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+              {getFolderTitle()}
+            </h3>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
-                placeholder="Cari email, pengirim, produk, atau nomor resi..."
+                placeholder="Cari email, pengirim, produk, atau tag..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="glass-input"
-                style={{ paddingLeft: '40px', fontSize: '0.86rem' }}
+                style={{ paddingLeft: '36px', fontSize: '0.84rem' }}
               />
-            </div>
-
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-              <span>{filteredEmails.length} Pesan</span>
             </div>
           </div>
 
-          {/* Filter Pills */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
-            {categories.map((cat) => {
-              const Icon = cat.icon;
-              const isSel = filterCategory === cat.id;
-
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    playClick();
-                    setFilterCategory(cat.id);
-                  }}
-                  className={`glass-pill ${isSel ? 'active' : ''}`}
-                  style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-                >
-                  <Icon size={13} />
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+            <span>{filteredEmails.length} Pesan</span>
           </div>
         </div>
 
@@ -165,8 +144,8 @@ export default function MailView({
           {filteredEmails.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
               <Inbox size={48} color="#93c5fd" style={{ marginBottom: '12px' }} />
-              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>Kotak Masuk Bersih</h4>
-              <p style={{ fontSize: '0.82rem' }}>Tidak ada email di kategori ini.</p>
+              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>Folder Ini Kosong</h4>
+              <p style={{ fontSize: '0.82rem' }}>Tidak ada email dalam {getFolderTitle()}.</p>
             </div>
           ) : (
             filteredEmails.map((mail) => {
@@ -196,6 +175,7 @@ export default function MailView({
                   {/* Left: Star + Sender + Subject + Snippet */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         playClick();
@@ -231,8 +211,8 @@ export default function MailView({
 
                     {/* Content Preview */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: isUnread ? 800 : 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: isUnread ? 800 : 600, color: 'var(--text-main)' }}>
                           {mail.from_name || mail.from_address}
                         </span>
 
@@ -241,6 +221,13 @@ export default function MailView({
                             {mail.alias_name}@
                           </span>
                         )}
+
+                        {/* AI Smart Tags Preview */}
+                        {(mail.ai_tags || []).slice(0, 2).map((t, idx) => (
+                          <span key={idx} style={{ fontSize: '0.65rem', background: '#f1f5f9', color: '#475569', padding: '1px 5px', borderRadius: '4px' }}>
+                            #{t}
+                          </span>
+                        ))}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -298,7 +285,7 @@ export default function MailView({
               </span>
             </div>
 
-            {/* Actions: Star, Delete */}
+            {/* Actions: Star, Trash, Spam, Restore, Delete */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 type="button"
@@ -314,20 +301,71 @@ export default function MailView({
                 <span>{selectedEmail.is_starred ? 'Berbintang' : 'Bintang'}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  playClick();
-                  onDeleteMail(selectedEmail.id);
-                  onBackToList();
-                }}
-                className="glass-btn"
-                style={{ padding: '7px 12px', fontSize: '0.8rem', color: '#dc2626' }}
-                title="Hapus Email"
-              >
-                <Trash2 size={15} />
-                <span>Hapus</span>
-              </button>
+              {selectedEmail.is_trash === 1 || selectedEmail.is_spam === 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClick();
+                      if (onRestoreMail) onRestoreMail(selectedEmail.id);
+                      onBackToList();
+                    }}
+                    className="glass-btn"
+                    style={{ padding: '7px 12px', fontSize: '0.8rem', color: '#059669' }}
+                    title="Kembalikan ke Kotak Masuk"
+                  >
+                    <RotateCcw size={15} />
+                    <span>Pulihkan</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClick();
+                      if (onPermanentDelete) onPermanentDelete(selectedEmail.id);
+                      onBackToList();
+                    }}
+                    className="glass-btn"
+                    style={{ padding: '7px 12px', fontSize: '0.8rem', color: '#dc2626' }}
+                    title="Hapus Permanen"
+                  >
+                    <Trash2 size={15} />
+                    <span>Hapus Permanen</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClick();
+                      if (onMoveToTrash) onMoveToTrash(selectedEmail.id);
+                      onBackToList();
+                    }}
+                    className="glass-btn"
+                    style={{ padding: '7px 12px', fontSize: '0.8rem', color: '#dc2626' }}
+                    title="Pindahkan ke Sampah"
+                  >
+                    <Trash2 size={15} />
+                    <span>Sampah</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClick();
+                      if (onMarkSpam) onMarkSpam(selectedEmail.id);
+                      onBackToList();
+                    }}
+                    className="glass-btn"
+                    style={{ padding: '7px 12px', fontSize: '0.8rem', color: '#64748b' }}
+                    title="Tandai sebagai Spam"
+                  >
+                    <AlertOctagon size={15} />
+                    <span>Spam</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -358,6 +396,19 @@ export default function MailView({
                 <span>{formatDate(selectedEmail.created_at)}</span>
               </div>
             </div>
+
+            {/* AI Tags Display */}
+            {selectedEmail.ai_tags && selectedEmail.ai_tags.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+                <Tag size={13} color="var(--brand-blue)" />
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Tag AI:</span>
+                {selectedEmail.ai_tags.map((t, idx) => (
+                  <span key={idx} style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* AI Intelligence Summary Pill */}

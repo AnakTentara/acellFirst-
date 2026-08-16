@@ -49,7 +49,61 @@ shoppingRouter.get('/items', async (req, res) => {
   }
 });
 
-// 2. Add manual shopping item
+// 2. Scan & auto-create package by tracking number alone
+shoppingRouter.post('/scan-resi', async (req, res) => {
+  try {
+    const { trackingNumber, notes } = req.body;
+    if (!trackingNumber) {
+      return res.status(400).json({ error: 'Nomor resi wajib diisi' });
+    }
+
+    const { scanTrackingNumberWithAI } = await import('../services/aiService.js');
+    const orderData = await scanTrackingNumberWithAI(trackingNumber);
+
+    const id = `shop_scan_${Date.now()}_${uuidv4().slice(0, 6)}`;
+    await run(`
+      INSERT INTO shopping_items (
+        id, platform, order_id, tracking_number, courier, item_title,
+        item_image, total_price, currency, status, estimated_delivery,
+        origin_city, destination_city, timeline_json, coordinates_json,
+        ai_summary, tracking_url, notes, buyer_name, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IDR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [
+      id,
+      orderData.platform,
+      orderData.order_id || `#SCAN-${Date.now().toString().slice(-5)}`,
+      orderData.tracking_number,
+      orderData.courier,
+      orderData.item_title,
+      orderData.item_image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop&q=80',
+      orderData.total_price || 0,
+      orderData.status || 'shipping',
+      orderData.estimated_delivery || '1-3 Hari Kerja',
+      orderData.origin_city || 'Jakarta Barat',
+      orderData.destination_city || 'Bandung',
+      JSON.stringify(orderData.timeline || []),
+      JSON.stringify(orderData.coordinates || {}),
+      `Scan Resi ${orderData.courier}: ${orderData.tracking_number}`,
+      orderData.tracking_url,
+      notes || 'Ditambahkan otomatis via AI Resi Scanner',
+      'Acell & Haikal'
+    ]);
+
+    const created = await getOne(`SELECT * FROM shopping_items WHERE id = ?`, [id]);
+    let timeline = [];
+    let coordinates = {};
+    try { timeline = JSON.parse(created.timeline_json || '[]'); } catch(e) {}
+    try { coordinates = JSON.parse(created.coordinates_json || '{}'); } catch(e) {}
+    const itemWithParsed = { ...created, timeline, coordinates };
+
+    broadcastEvent('shopping_update', itemWithParsed);
+    res.json({ success: true, item: itemWithParsed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Add manual shopping item
 shoppingRouter.post('/manual', async (req, res) => {
   try {
     const { platform, orderId, trackingNumber, courier, itemTitle, itemImage, totalPrice, status, estimated_delivery, notes, buyer_name } = req.body;

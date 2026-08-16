@@ -6,43 +6,58 @@ import {
   Sparkles, 
   Send, 
   Tag,
+  Star,
+  Trash2,
+  AlertOctagon,
+  User,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  ChevronDown
 } from 'lucide-react';
 import { playClick } from '../utils/sound';
 
 export default function Sidebar({
   activeTab,
   onSelectTab,
+  activeMailFolder,
+  onSelectMailFolder,
   onOpenCompose,
-  unreadStats,
+  mailStats,
+  shoppingStats,
   isCollapsed,
   onToggleCollapse
 }) {
-  const navItems = [
+  const mailFolders = [
+    { id: 'inbox', label: 'Kotak Masuk', icon: Inbox, badge: mailStats?.unreadTotal || null, color: '#2563eb' },
+    { id: 'starred', label: 'Berbintang', icon: Star, badge: mailStats?.starredCount || null, color: '#eab308' },
+    { id: 'shopping', label: 'Belanja & Resi', icon: ShoppingBag, badge: mailStats?.unreadShopping || null, color: '#0284c7' },
+    { id: 'love', label: 'Surat Cinta', icon: Heart, badge: mailStats?.unreadLove || null, color: '#4f46e5' },
+    { id: 'personal', label: 'Personal Acell & Haikal', icon: User, badge: null, color: '#0ea5e9' },
+    { id: 'sent', label: 'Terkirim', icon: Send, badge: null, color: '#64748b' },
+    { id: 'trash', label: 'Sampah', icon: Trash2, badge: mailStats?.trashCount || null, color: '#dc2626' },
+    { id: 'spam', label: 'Spam', icon: AlertOctagon, badge: mailStats?.spamCount || null, color: '#94a3b8' }
+  ];
+
+  const mainTabs = [
     {
-      id: 'inbox',
-      label: 'AcellMail Inbox',
-      icon: Inbox,
-      badge: unreadStats?.unreadShopping || unreadStats?.unreadLove ? (unreadStats?.unreadShopping + unreadStats?.unreadLove) : null,
-      color: '#2563eb'
-    },
-    {
-      id: 'shopping',
-      label: 'Shopping & Resi',
+      id: 'shopping_tab',
+      targetTab: 'shopping',
+      label: 'Shopping Radar & Peta',
       icon: ShoppingBag,
-      badge: unreadStats?.activePackages || null,
+      badge: shoppingStats?.activePackages || null,
       color: '#0284c7'
     },
     {
-      id: 'love',
-      label: 'Surat Cinta',
+      id: 'love_tab',
+      targetTab: 'love',
+      label: 'Kapsul Waktu & Surat',
       icon: Heart,
-      badge: unreadStats?.unreadLove || null,
+      badge: null,
       color: '#4f46e5'
     },
     {
-      id: 'wishlist',
+      id: 'wishlist_tab',
+      targetTab: 'wishlist',
       label: 'Wishlist Bersama',
       icon: Sparkles,
       badge: null,
@@ -68,8 +83,8 @@ export default function Sidebar({
         paddingBottom: '4px'
       }}>
         {!isCollapsed && (
-          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Menu Utama
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            AcellMail & Apps
           </span>
         )}
         <button
@@ -114,57 +129,118 @@ export default function Sidebar({
         {!isCollapsed && <span>Tulis Surat</span>}
       </button>
 
-      {/* Navigation List */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
+      {/* 1. Folders & Smart Tags Sub-Navigation */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+        {!isCollapsed && (
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px 2px 8px' }}>
+            Folder Email
+          </div>
+        )}
+
+        {mailFolders.map((folder) => {
+          const Icon = folder.icon;
+          const isSelected = activeTab === 'inbox' && (activeMailFolder || 'inbox') === folder.id;
 
           return (
             <button
-              key={item.id}
+              key={folder.id}
               onClick={() => {
                 playClick();
-                onSelectTab(item.id);
+                onSelectTab('inbox');
+                if (onSelectMailFolder) onSelectMailFolder(folder.id);
               }}
-              title={isCollapsed ? item.label : undefined}
+              title={isCollapsed ? folder.label : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: isCollapsed ? 'center' : 'space-between',
-                padding: isCollapsed ? '10px 0' : '9px 12px',
-                borderRadius: '12px',
+                padding: isCollapsed ? '9px 0' : '8px 12px',
+                borderRadius: '10px',
                 border: '1px solid',
-                borderColor: isActive ? 'rgba(37, 99, 235, 0.3)' : 'transparent',
-                background: isActive 
+                borderColor: isSelected ? 'rgba(37, 99, 235, 0.3)' : 'transparent',
+                background: isSelected 
                   ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.95) 100%)' 
                   : 'transparent',
-                color: isActive ? 'var(--brand-blue-deep)' : 'var(--text-secondary)',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: '0.86rem',
+                color: isSelected ? 'var(--brand-blue-deep)' : 'var(--text-secondary)',
+                fontWeight: isSelected ? 800 : 500,
+                fontSize: '0.84rem',
                 cursor: 'pointer',
-                transition: 'all 0.18s ease',
-                boxShadow: isActive ? '0 4px 14px rgba(37, 99, 235, 0.1)' : 'none',
+                transition: 'all 0.16s ease',
+                boxShadow: isSelected ? '0 4px 12px rgba(37, 99, 235, 0.08)' : 'none',
                 position: 'relative'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: isActive ? `${item.color}15` : 'rgba(0,0,0,0.02)',
-                  color: isActive ? item.color : 'var(--text-muted)'
-                }}>
-                  <Icon size={16} />
-                </div>
-                {!isCollapsed && <span>{item.label}</span>}
+                <Icon size={15} color={isSelected ? folder.color : 'var(--text-muted)'} />
+                {!isCollapsed && <span>{folder.label}</span>}
               </div>
 
-              {item.badge ? (
+              {folder.badge ? (
+                <span style={{
+                  background: isSelected ? 'var(--brand-blue)' : '#e2e8f0',
+                  color: isSelected ? '#fff' : 'var(--text-main)',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  position: isCollapsed ? 'absolute' : 'static',
+                  top: isCollapsed ? '2px' : 'auto',
+                  right: isCollapsed ? '2px' : 'auto'
+                }}>
+                  {folder.badge}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 2. Apps & Sanctuary Features */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', borderTop: '1px solid rgba(219, 234, 254, 0.5)', paddingTop: '10px' }}>
+        {!isCollapsed && (
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px 2px 8px' }}>
+            Fitur Pasangan
+          </div>
+        )}
+
+        {mainTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isSelected = activeTab === tab.targetTab;
+
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                playClick();
+                onSelectTab(tab.targetTab);
+              }}
+              title={isCollapsed ? tab.label : undefined}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: isCollapsed ? 'center' : 'space-between',
+                padding: isCollapsed ? '9px 0' : '8px 12px',
+                borderRadius: '10px',
+                border: '1px solid',
+                borderColor: isSelected ? 'rgba(37, 99, 235, 0.3)' : 'transparent',
+                background: isSelected 
+                  ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.95) 100%)' 
+                  : 'transparent',
+                color: isSelected ? 'var(--brand-blue-deep)' : 'var(--text-secondary)',
+                fontWeight: isSelected ? 800 : 500,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                transition: 'all 0.16s ease',
+                boxShadow: isSelected ? '0 4px 12px rgba(37, 99, 235, 0.08)' : 'none',
+                position: 'relative'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Icon size={15} color={isSelected ? tab.color : 'var(--text-muted)'} />
+                {!isCollapsed && <span>{tab.label}</span>}
+              </div>
+
+              {tab.badge ? (
                 <span style={{
                   background: 'var(--brand-blue)',
                   color: '#fff',
@@ -173,23 +249,23 @@ export default function Sidebar({
                   padding: '1px 6px',
                   borderRadius: '999px',
                   position: isCollapsed ? 'absolute' : 'static',
-                  top: isCollapsed ? '4px' : 'auto',
-                  right: isCollapsed ? '4px' : 'auto'
+                  top: isCollapsed ? '2px' : 'auto',
+                  right: isCollapsed ? '2px' : 'auto'
                 }}>
-                  {item.badge}
+                  {tab.badge}
                 </span>
               ) : null}
             </button>
           );
         })}
-      </nav>
+      </div>
 
       {/* Aliases List Info (Visible when expanded) */}
       {!isCollapsed && (
-        <div style={{ padding: '6px 8px', fontSize: '0.74rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(219, 234, 254, 0.5)', paddingTop: '12px' }}>
+        <div style={{ padding: '6px 8px', fontSize: '0.74rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(219, 234, 254, 0.5)', paddingTop: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontWeight: 700, color: 'var(--text-secondary)' }}>
             <Tag size={12} />
-            <span>Alias Email Resmi:</span>
+            <span>Alias Email Aktif:</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
             {['us@', 'shopping@', 'etall@', 'acell@'].map(a => (

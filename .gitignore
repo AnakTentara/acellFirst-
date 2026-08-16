@@ -18,6 +18,7 @@ backend/data/uploads/*
 !backend/data/uploads/.gitkeep
 
 # Build outputs
-dist/
+/dist/
+!frontend/dist/**
 .DS_Store
 *.log

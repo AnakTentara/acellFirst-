@@ -126,6 +126,9 @@ export const initDatabase = async () => {
       attachments_json TEXT DEFAULT '[]',
       ai_summary TEXT,
       ai_sentiment TEXT,
+      is_trash INTEGER DEFAULT 0,
+      is_spam INTEGER DEFAULT 0,
+      ai_tags_json TEXT DEFAULT '[]',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -135,6 +138,9 @@ export const initDatabase = async () => {
   try { await run(`ALTER TABLE emails ADD COLUMN is_draft INTEGER DEFAULT 0`); } catch (e) {}
   try { await run(`ALTER TABLE emails ADD COLUMN ai_summary TEXT`); } catch (e) {}
   try { await run(`ALTER TABLE emails ADD COLUMN ai_sentiment TEXT`); } catch (e) {}
+  try { await run(`ALTER TABLE emails ADD COLUMN is_trash INTEGER DEFAULT 0`); } catch (e) {}
+  try { await run(`ALTER TABLE emails ADD COLUMN is_spam INTEGER DEFAULT 0`); } catch (e) {}
+  try { await run(`ALTER TABLE emails ADD COLUMN ai_tags_json TEXT DEFAULT '[]'`); } catch (e) {}
 
   // 3. Shopping Items Table
   await run(`

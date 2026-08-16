@@ -27,20 +27,59 @@ mailRouter.post('/inbound', async (req, res) => {
   }
 });
 
-// 2. Get Mail List with search & filters
+// Helper to compute fresh mail stats
+async function computeMailStats() {
+  const unreadTotal = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_trash = 0 AND is_spam = 0 AND is_outbound = 0 AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
+  const unreadShopping = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'shopping' AND is_trash = 0 AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
+  const unreadLove = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'love' AND is_trash = 0 AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
+  const trashCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_trash = 1`);
+  const spamCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_spam = 1`);
+  const starredCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_starred = 1 AND is_trash = 0`);
+  const sentCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_outbound = 1 AND is_trash = 0`);
+
+  return {
+    unreadTotal: unreadTotal?.count || 0,
+    unreadShopping: unreadShopping?.count || 0,
+    unreadLove: unreadLove?.count || 0,
+    trashCount: trashCount?.count || 0,
+    spamCount: spamCount?.count || 0,
+    starredCount: starredCount?.count || 0,
+    sentCount: sentCount?.count || 0
+  };
+}
+
+// 2. Get Mail List with folder, search & tag filters
 mailRouter.get('/inbox', async (req, res) => {
   try {
-    const { category, alias, search, starred, userRole, type } = req.query;
+    const { folder, category, alias, search, tag } = req.query;
     let sql = `SELECT * FROM emails WHERE is_archived = 0`;
     const params = [];
 
-    if (type === 'sent') {
-      sql += ` AND is_outbound = 1`;
-    } else if (type === 'inbox') {
-      sql += ` AND (is_outbound = 0 OR is_outbound IS NULL)`;
+    // Folder filtration
+    if (folder === 'trash') {
+      sql += ` AND is_trash = 1`;
+    } else if (folder === 'spam') {
+      sql += ` AND is_spam = 1`;
+    } else {
+      sql += ` AND is_trash = 0 AND is_spam = 0`;
+
+      if (folder === 'starred') {
+        sql += ` AND is_starred = 1`;
+      } else if (folder === 'sent') {
+        sql += ` AND is_outbound = 1`;
+      } else if (folder === 'shopping') {
+        sql += ` AND category = 'shopping'`;
+      } else if (folder === 'love') {
+        sql += ` AND category = 'love'`;
+      } else if (folder === 'personal') {
+        sql += ` AND (category = 'personal' OR alias_name = 'acell' OR alias_name = 'us')`;
+      } else {
+        // default inbox
+        sql += ` AND (is_outbound = 0 OR is_outbound IS NULL)`;
+      }
     }
 
-    if (category && category !== 'all') {
+    if (category && category !== 'all' && !folder) {
       sql += ` AND category = ?`;
       params.push(category);
     }
@@ -50,8 +89,9 @@ mailRouter.get('/inbox', async (req, res) => {
       params.push(alias.toLowerCase());
     }
 
-    if (starred === 'true') {
-      sql += ` AND is_starred = 1`;
+    if (tag) {
+      sql += ` AND ai_tags_json LIKE ?`;
+      params.push(`%${tag}%`);
     }
 
     if (search) {
@@ -60,23 +100,21 @@ mailRouter.get('/inbox', async (req, res) => {
       params.push(term, term, term, term);
     }
 
-    sql += ` ORDER BY created_at DESC LIMIT 100`;
+    sql += ` ORDER BY created_at DESC LIMIT 150`;
 
-    const emails = await query(sql, params);
+    const rawEmails = await query(sql, params);
+    const emails = rawEmails.map(mail => {
+      let aiTags = [];
+      try { aiTags = JSON.parse(mail.ai_tags_json || '[]'); } catch(e) {}
+      return { ...mail, ai_tags: aiTags };
+    });
 
-    // Calculate unread counts
-    const unreadShopping = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'shopping' AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
-    const unreadLove = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'love' AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
-    const totalCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_archived = 0`);
+    const stats = await computeMailStats();
 
     res.json({
       success: true,
       emails,
-      stats: {
-        total: totalCount?.count || 0,
-        unreadShopping: unreadShopping?.count || 0,
-        unreadLove: unreadLove?.count || 0
-      }
+      stats
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -92,10 +130,11 @@ mailRouter.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Email tidak ditemukan' });
     }
 
-    // Attach shopping item if available
     const shoppingItem = await getOne(`SELECT * FROM shopping_items WHERE email_id = ?`, [id]);
+    let aiTags = [];
+    try { aiTags = JSON.parse(email.ai_tags_json || '[]'); } catch(e) {}
 
-    res.json({ success: true, email, shoppingItem });
+    res.json({ success: true, email: { ...email, ai_tags: aiTags }, shoppingItem });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -115,8 +154,9 @@ mailRouter.patch('/:id/read', async (req, res) => {
       await run(`UPDATE emails SET is_read_by_boy = 1, is_read_by_girl = 1 WHERE id = ?`, [id]);
     }
 
-    broadcastEvent('mail_read_update', { id, role });
-    res.json({ success: true });
+    const stats = await computeMailStats();
+    broadcastEvent('mail_read_update', { id, role, stats });
+    res.json({ success: true, stats });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -132,19 +172,60 @@ mailRouter.patch('/:id/star', async (req, res) => {
     const newStarred = email.is_starred === 1 ? 0 : 1;
     await run(`UPDATE emails SET is_starred = ? WHERE id = ?`, [newStarred, id]);
 
-    res.json({ success: true, isStarred: newStarred === 1 });
+    const stats = await computeMailStats();
+    res.json({ success: true, isStarred: newStarred === 1, stats });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 6. Delete / Archive Email
+// 6. Move to Trash / Sampah
+mailRouter.patch('/:id/trash', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await run(`UPDATE emails SET is_trash = 1, is_read_by_boy = 1, is_read_by_girl = 1 WHERE id = ?`, [id]);
+    const stats = await computeMailStats();
+    broadcastEvent('mail_trash', { id, stats });
+    res.json({ success: true, message: 'Email dipindahkan ke Sampah', stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Restore from Trash / Spam
+mailRouter.patch('/:id/restore', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await run(`UPDATE emails SET is_trash = 0, is_spam = 0 WHERE id = ?`, [id]);
+    const stats = await computeMailStats();
+    broadcastEvent('mail_restore', { id, stats });
+    res.json({ success: true, message: 'Email dikembalikan ke Kotak Masuk', stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. Mark as Spam
+mailRouter.patch('/:id/spam', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await run(`UPDATE emails SET is_spam = 1, is_read_by_boy = 1, is_read_by_girl = 1 WHERE id = ?`, [id]);
+    const stats = await computeMailStats();
+    broadcastEvent('mail_spam', { id, stats });
+    res.json({ success: true, message: 'Email ditandai sebagai Spam', stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9. Permanent Delete Email
 mailRouter.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await run(`UPDATE emails SET is_archived = 1 WHERE id = ?`, [id]);
-    broadcastEvent('mail_deleted', { id });
-    res.json({ success: true, message: 'Email dipindahkan ke arsip' });
+    await run(`DELETE FROM emails WHERE id = ?`, [id]);
+    const stats = await computeMailStats();
+    broadcastEvent('mail_deleted', { id, stats });
+    res.json({ success: true, message: 'Email dihapus permanen', stats });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

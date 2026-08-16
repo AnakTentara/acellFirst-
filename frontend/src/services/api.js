@@ -44,6 +44,9 @@ export const mailApi = {
   verifySmtp: (data) => request('/api/mail/verify-smtp', { method: 'POST', body: JSON.stringify(data) }),
   markRead: (id, role) => request(`/api/mail/${id}/read`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   toggleStar: (id) => request(`/api/mail/${id}/star`, { method: 'PATCH' }),
+  moveToTrash: (id) => request(`/api/mail/${id}/trash`, { method: 'PATCH' }),
+  restoreMail: (id) => request(`/api/mail/${id}/restore`, { method: 'PATCH' }),
+  markSpam: (id) => request(`/api/mail/${id}/spam`, { method: 'PATCH' }),
   deleteMail: (id) => request(`/api/mail/${id}`, { method: 'DELETE' }),
   simulateTestMail: (type) => request('/api/mail/simulate-test', { method: 'POST', body: JSON.stringify({ type }) })
 };
@@ -54,6 +57,7 @@ export const shoppingApi = {
     const query = new URLSearchParams(params).toString();
     return request(`/api/shopping/items?${query}`);
   },
+  scanResi: (data) => request('/api/shopping/scan-resi', { method: 'POST', body: JSON.stringify(data) }),
   addManual: (data) => request('/api/shopping/manual', { method: 'POST', body: JSON.stringify(data) }),
   updateStatus: (id, data) => request(`/api/shopping/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteItem: (id) => request(`/api/shopping/${id}`, { method: 'DELETE' }),

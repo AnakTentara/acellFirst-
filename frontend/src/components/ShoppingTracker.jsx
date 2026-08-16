@@ -32,6 +32,9 @@ export default function ShoppingTracker({
   const [copiedId, setCopiedId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMapItem, setSelectedMapItem] = useState(null);
+  const [addMode, setAddMode] = useState('scan'); // 'scan' or 'manual'
+  const [autoResiInput, setAutoResiInput] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
 
   // Form states for manual order
   const [manualTitle, setManualTitle] = useState('');
@@ -51,6 +54,28 @@ export default function ShoppingTracker({
     setCopiedId(id);
     playClick();
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleAutoScanResi = async (e) => {
+    e.preventDefault();
+    if (!autoResiInput) return;
+    setIsScanning(true);
+    try {
+      if (onAddManual) {
+        // Use scanResi or fallback
+        const { shoppingApi } = await import('../services/api');
+        const res = await shoppingApi.scanResi({ trackingNumber: autoResiInput });
+        if (res.success) {
+          setShowAddModal(false);
+          setAutoResiInput('');
+          playHeartPop();
+        }
+      }
+    } catch (err) {
+      alert('Gagal scan resi: ' + err.message);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handleSaveManual = async (e) => {
@@ -472,6 +497,7 @@ export default function ShoppingTracker({
       )}
 
       {/* Manual Order Modal */}
+      {/* Manual & Auto-Scan Order Modal */}
       {showAddModal && (
         <div style={{
           position: 'fixed',
@@ -487,113 +513,187 @@ export default function ShoppingTracker({
           zIndex: 9999,
           padding: '16px'
         }}>
-          <form onSubmit={handleSaveManual} className="glass-panel" style={{ width: '100%', maxWidth: '440px', padding: '24px', background: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Tambah Paket Manual</h3>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '460px', padding: '24px', background: '#fff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Tambah Paket Belanja</h3>
               <button type="button" onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nama Barang</label>
-                <input
-                  type="text"
-                  required
-                  value={manualTitle}
-                  onChange={(e) => setManualTitle(e.target.value)}
-                  placeholder="Contoh: Skincare Glow Set / Baju Lucu"
-                  className="glass-input"
-                  style={{ fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Platform</label>
-                  <select
-                    value={manualPlatform}
-                    onChange={(e) => setManualPlatform(e.target.value)}
-                    className="glass-input"
-                    style={{ fontSize: '0.85rem' }}
-                  >
-                    <option value="Shopee">Shopee</option>
-                    <option value="Tokopedia">Tokopedia</option>
-                    <option value="TikTok Shop">TikTok Shop</option>
-                    <option value="Lazada">Lazada</option>
-                    <option value="Lion Parcel">Lion Parcel</option>
-                    <option value="Apple Store">Apple Store</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Kurir</label>
-                  <select
-                    value={manualCourier}
-                    onChange={(e) => setManualCourier(e.target.value)}
-                    className="glass-input"
-                    style={{ fontSize: '0.85rem' }}
-                  >
-                    <option value="SPX Express">SPX Express</option>
-                    <option value="J&T Express">J&T Express</option>
-                    <option value="JNE">JNE</option>
-                    <option value="SiCepat">SiCepat</option>
-                    <option value="Lion Parcel">Lion Parcel</option>
-                    <option value="Anteraja">Anteraja</option>
-                    <option value="Ninja Xpress">Ninja Xpress</option>
-                    <option value="POS Indonesia">POS Indonesia</option>
-                    <option value="Kurir Lain">Kurir Lain</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nomor Resi (AWB)</label>
-                  <input
-                    type="text"
-                    value={manualResi}
-                    onChange={(e) => setManualResi(e.target.value)}
-                    placeholder="Contoh: SPX12345678"
-                    className="glass-input"
-                    style={{ fontSize: '0.85rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Total Harga (Rp)</label>
-                  <input
-                    type="number"
-                    value={manualPrice}
-                    onChange={(e) => setManualPrice(e.target.value)}
-                    placeholder="150000"
-                    className="glass-input"
-                    style={{ fontSize: '0.85rem' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Catatan / Keterangan</label>
-                <input
-                  type="text"
-                  value={manualNotes}
-                  onChange={(e) => setManualNotes(e.target.value)}
-                  placeholder="Kado manis untuk Princess Acell"
-                  className="glass-input"
-                  style={{ fontSize: '0.85rem' }}
-                />
-              </div>
-
+            {/* Mode Switcher */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
               <button
-                type="submit"
-                className="glass-btn glass-btn-primary"
-                style={{ width: '100%', marginTop: '6px', padding: '12px' }}
+                type="button"
+                onClick={() => setAddMode('scan')}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: addMode === 'scan' ? '#fff' : 'transparent',
+                  color: addMode === 'scan' ? '#2563eb' : '#64748b',
+                  fontWeight: addMode === 'scan' ? 800 : 600,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxShadow: addMode === 'scan' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+                }}
               >
-                Simpan Paket
+                ✨ Scan Resi AI Otomatis
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode('manual')}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: addMode === 'manual' ? '#fff' : 'transparent',
+                  color: addMode === 'manual' ? '#2563eb' : '#64748b',
+                  fontWeight: addMode === 'manual' ? 800 : 600,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxShadow: addMode === 'manual' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+                }}
+              >
+                Form Lengkap
               </button>
             </div>
-          </form>
+
+            {addMode === 'scan' ? (
+              <form onSubmit={handleAutoScanResi} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '12px', fontSize: '0.78rem', color: '#1e40af' }}>
+                  💡 <b>Cukup Masukkan Nomor Resi Saja!</b><br/>
+                  AI akan otomatis mendeteksi ekspedisi (SPX, J&T, SiCepat, Lion Parcel, JNE, POS, Anteraja), rute gudang &rarr; Bandung, dan estimasi waktu sampai.
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Nomor Resi / AWB Paket
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={autoResiInput}
+                    onChange={(e) => setAutoResiInput(e.target.value)}
+                    placeholder="Contoh: SPXID048192841 / JX9827361928 / 0048192841"
+                    className="glass-input"
+                    style={{ fontSize: '0.9rem', fontFamily: 'monospace' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isScanning}
+                  className="glass-btn glass-btn-primary"
+                  style={{ width: '100%', padding: '12px', fontSize: '0.9rem' }}
+                >
+                  <Sparkles size={16} />
+                  <span>{isScanning ? 'AI Sedang Memindai...' : '⚡ Scan & Tambahkan Paket'}</span>
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSaveManual} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nama Barang</label>
+                  <input
+                    type="text"
+                    required
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    placeholder="Contoh: Skincare Glow Set / Baju Lucu"
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Platform</label>
+                    <select
+                      value={manualPlatform}
+                      onChange={(e) => setManualPlatform(e.target.value)}
+                      className="glass-input"
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      <option value="Shopee">Shopee</option>
+                      <option value="Tokopedia">Tokopedia</option>
+                      <option value="TikTok Shop">TikTok Shop</option>
+                      <option value="Lazada">Lazada</option>
+                      <option value="Lion Parcel">Lion Parcel</option>
+                      <option value="Apple Store">Apple Store</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Kurir</label>
+                    <select
+                      value={manualCourier}
+                      onChange={(e) => setManualCourier(e.target.value)}
+                      className="glass-input"
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      <option value="SPX Express">SPX Express</option>
+                      <option value="J&T Express">J&T Express</option>
+                      <option value="JNE">JNE</option>
+                      <option value="SiCepat">SiCepat</option>
+                      <option value="Lion Parcel">Lion Parcel</option>
+                      <option value="Anteraja">Anteraja</option>
+                      <option value="Ninja Xpress">Ninja Xpress</option>
+                      <option value="POS Indonesia">POS Indonesia</option>
+                      <option value="Kurir Lain">Kurir Lain</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nomor Resi (AWB)</label>
+                    <input
+                      type="text"
+                      value={manualResi}
+                      onChange={(e) => setManualResi(e.target.value)}
+                      placeholder="Contoh: SPX12345678"
+                      className="glass-input"
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Total Harga (Rp)</label>
+                    <input
+                      type="number"
+                      value={manualPrice}
+                      onChange={(e) => setManualPrice(e.target.value)}
+                      placeholder="150000"
+                      className="glass-input"
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Catatan / Keterangan</label>
+                  <input
+                    type="text"
+                    value={manualNotes}
+                    onChange={(e) => setManualNotes(e.target.value)}
+                    placeholder="Kado manis untuk Princess Acell"
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="glass-btn glass-btn-primary"
+                  style={{ width: '100%', marginTop: '6px', padding: '12px' }}
+                >
+                  Simpan Paket
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -47,6 +47,7 @@ Kembalikan HANYA JSON valid tanpa format markdown atau penjelasan lain dengan sk
   "category": "shopping" | "love" | "personal" | "general",
   "summary": "Ringkasan 1-2 kalimat ramah dan jelas tentang email ini",
   "sentiment": "happy" | "romantic" | "neutral" | "urgent",
+  "tags": ["tag1", "tag2", "tag3"],
   "order": {
     "platform": "Shopee" | "Tokopedia" | "TikTok Shop" | "Lazada" | "Blibli" | "Lion Parcel" | "Apple" | "Store Lain",
     "courier": "SPX Express" | "JNE" | "J&T Express" | "SiCepat" | "Lion Parcel" | "Anteraja" | "Ninja Xpress" | "POS Indonesia" | "Paxel" | "Kurir Lain",
@@ -244,4 +245,148 @@ export function getCourierTrackingUrl(courier, resi) {
     return `https://www.posindonesia.co.id/id/tracking`;
   }
   return `https://cekresi.com/?noresi=${encodeURIComponent(resi)}`;
+}
+
+/**
+ * Scan and analyze tracking number / resi alone using AI & courier pattern intelligence
+ */
+export async function scanTrackingNumberWithAI(rawInput) {
+  const cleanInput = (rawInput || '').trim();
+  const apiKey = process.env.AI_API_KEY || '';
+  const baseUrl = (process.env.AI_BASE_URL || 'https://ohhmyagent.com/v1').replace(/\/$/, '');
+  const model = process.env.AI_MODEL || 'ohh/gpt-5.6';
+
+  // 1. Detect Courier & Platform by pattern
+  let courier = 'Kurir Ekspedisi';
+  let platform = 'Online Store';
+  let resi = cleanInput;
+
+  // Extract resi if user pasted multi-line text
+  const spxMatch = cleanInput.match(/(SPX[A-Z0-9]{8,20})/i);
+  const jntMatch = cleanInput.match(/(Jx[0-9]{8,16}|JP[0-9]{8,16}|[0-9]{12})/i);
+  const sicepatMatch = cleanInput.match(/(00[0-9]{10,14})/i);
+  const lionMatch = cleanInput.match(/(LP[0-9]{8,14}|[0-9]{11,15})/i);
+  const anterajaMatch = cleanInput.match(/(1000[0-9]{8,14})/i);
+  const jneMatch = cleanInput.match(/(JNE[0-9]{8,14}|[0-9]{13,16})/i);
+  const ninjaMatch = cleanInput.match(/(NVID[0-9]{8,14})/i);
+  const posMatch = cleanInput.match(/(P[0-9]{11,14})/i);
+  const paxelMatch = cleanInput.match(/(EM\.[A-Za-z0-9\-]{8,16})/i);
+
+  if (spxMatch) {
+    courier = 'SPX Express';
+    platform = 'Shopee';
+    resi = spxMatch[1];
+  } else if (jntMatch && !cleanInput.startsWith('00') && !cleanInput.startsWith('1000')) {
+    courier = 'J&T Express';
+    platform = /tiktok/i.test(cleanInput) ? 'TikTok Shop' : 'Shopee / Tokopedia';
+    resi = jntMatch[1];
+  } else if (sicepatMatch) {
+    courier = 'SiCepat Express';
+    platform = 'Tokopedia';
+    resi = sicepatMatch[1];
+  } else if (lionMatch && !cleanInput.startsWith('00')) {
+    courier = 'Lion Parcel';
+    platform = 'E-Commerce';
+    resi = lionMatch[1];
+  } else if (anterajaMatch) {
+    courier = 'Anteraja';
+    platform = 'Tokopedia';
+    resi = anterajaMatch[1];
+  } else if (jneMatch) {
+    courier = 'JNE Express';
+    platform = 'Online Store';
+    resi = jneMatch[1];
+  } else if (ninjaMatch) {
+    courier = 'Ninja Xpress';
+    platform = 'TikTok Shop / Shopee';
+    resi = ninjaMatch[1];
+  } else if (posMatch) {
+    courier = 'POS Indonesia';
+    platform = 'Kiriman Paket';
+    resi = posMatch[1];
+  } else if (paxelMatch) {
+    courier = 'Paxel';
+    platform = 'Kuliner & Paket Dingin';
+    resi = paxelMatch[1];
+  }
+
+  // 2. Query OhhMyAgent AI if API key is available for deep inference
+  let itemTitle = `Paket ${platform} (${courier})`;
+  let estimatedDelivery = '1-3 Hari Kerja';
+  let originCity = 'Jakarta Barat (Sorting Center)';
+  let destinationCity = 'Bandung (Sanctuary Acell & Haikal)';
+  let totalPrice = 0;
+
+  if (apiKey) {
+    try {
+      const prompt = `
+Analisis nomor resi/tracking pengiriman ini untuk ekosistem couple "Acell & Haikal Sanctuary":
+Nomor Resi / Input: "${cleanInput}"
+
+Ekspedisi Terdeteksi: ${courier}
+Platform: ${platform}
+
+Kembalikan HANYA JSON valid:
+{
+  "item_title": "nama tebakan produk atau paket menarik",
+  "courier": "${courier}",
+  "platform": "${platform}",
+  "origin_city": "Kota Asal (misal: Jakarta / Tangerang / Surabaya)",
+  "destination_city": "Bandung (Alamat Acell & Haikal)",
+  "estimated_delivery": "Estimasi 1-3 hari",
+  "total_price": 150000,
+  "summary": "Ringkasan status pengiriman singkat"
+}
+`;
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'x-api-key': apiKey
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'system', content: 'You are an AI courier tracking assistant. Always respond with strict valid JSON only.' },
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const raw = data.choices?.[0]?.message?.content || '{}';
+        const cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const aiData = JSON.parse(cleaned);
+        if (aiData.item_title) itemTitle = aiData.item_title;
+        if (aiData.courier) courier = aiData.courier;
+        if (aiData.platform) platform = aiData.platform;
+        if (aiData.origin_city) originCity = aiData.origin_city;
+        if (aiData.estimated_delivery) estimatedDelivery = aiData.estimated_delivery;
+        if (aiData.total_price) totalPrice = aiData.total_price;
+      }
+    } catch (e) {
+      console.warn('⚠️ AI resi scan fallback:', e.message);
+    }
+  }
+
+  // 3. Build Coordinates & Timeline
+  const enriched = enrichOrderWithGeoTimeline({
+    is_order_receipt: true,
+    order: {
+      platform,
+      courier,
+      tracking_number: resi,
+      item_title: itemTitle,
+      total_price: totalPrice,
+      currency: 'IDR',
+      status: 'shipping',
+      estimated_delivery: estimatedDelivery,
+      origin_city: originCity,
+      destination_city: destinationCity
+    }
+  }, { subject: `Scan Resi ${resi}` });
+
+  return enriched.order;
 }
