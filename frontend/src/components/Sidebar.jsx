@@ -12,7 +12,8 @@ import {
   User,
   PanelLeftClose,
   PanelLeftOpen,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { playClick } from '../utils/sound';
 
@@ -24,9 +25,15 @@ export default function Sidebar({
   onOpenCompose,
   mailStats,
   shoppingStats,
-  isCollapsed,
-  onToggleCollapse
+  isCollapsed: isCollapsedProp,
+  onToggleCollapse,
+  isMobileOpen,
+  onCloseMobile
 }) {
+  // Icon-only mode is a desktop space-saver. Inside the mobile drawer there
+  // is plenty of room, so labels always stay visible there.
+  const isCollapsed = isMobileOpen ? false : isCollapsedProp;
+
   const mailFolders = [
     { id: 'inbox', label: 'Kotak Masuk', icon: Inbox, badge: mailStats?.unreadTotal || null, color: '#2563eb' },
     { id: 'starred', label: 'Berbintang', icon: Star, badge: mailStats?.starredCount || null, color: '#eab308' },
@@ -87,13 +94,15 @@ export default function Sidebar({
             AcellMail & Apps
           </span>
         )}
+        {/* Collapse only makes sense on desktop; in the mobile drawer the
+            same slot becomes a close button. */}
         <button
           type="button"
           onClick={() => {
             playClick();
             onToggleCollapse();
           }}
-          className="glass-btn"
+          className="glass-btn sidebar-collapse-btn"
           style={{
             padding: '6px',
             borderRadius: '8px',
@@ -103,6 +112,18 @@ export default function Sidebar({
           title={isCollapsed ? 'Buka Sidebar' : 'Tutup Sidebar'}
         >
           {isCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            playClick();
+            if (onCloseMobile) onCloseMobile();
+          }}
+          className="glass-btn sidebar-close-btn"
+          aria-label="Tutup menu"
+        >
+          <X size={16} />
         </button>
       </div>
 

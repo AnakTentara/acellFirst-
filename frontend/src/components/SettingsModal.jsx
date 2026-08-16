@@ -235,7 +235,7 @@ export default function SettingsModal({
   if (!isOpen) return null;
 
   return (
-    <div style={{
+    <div className="sheet-scrim" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -442,7 +442,7 @@ export default function SettingsModal({
 
             {/* Add Address Modal Form */}
             {showAddAddressForm && (
-              <div style={{
+              <div className="sheet-scrim" style={{
                 position: 'fixed',
                 top: 0,
                 left: 0,

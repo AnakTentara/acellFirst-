@@ -1,10 +1,13 @@
 import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { run, getOne } from '../db.js';
 import { config } from '../config.js';
 import { parseReceiptEmail } from '../parsers/receiptParser.js';
-import { analyzeEmailWithAI, getCourierTrackingUrl } from './aiService.js';
+import { analyzeEmailWithAI, getCourierTrackingUrl, detectCourierFromAwb } from './aiService.js';
 import { sendPushNotification, broadcastEvent } from './pushService.js';
 
 // Setup Nodemailer transporter if SMTP config provided
@@ -19,6 +22,43 @@ if (config.smtp.host && config.smtp.user) {
       pass: config.smtp.pass
     }
   });
+}
+
+const ATTACHMENTS_DIR = path.join(config.uploadsPath, 'attachments');
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+
+/**
+ * Write attachment bytes to disk and return metadata rows.
+ * Filenames are randomised; the original name is kept only as a label, so a
+ * hostile "../../etc/passwd" or "invoice.pdf.html" can never reach the FS.
+ */
+async function persistAttachments(parsedAttachments) {
+  await fs.promises.mkdir(ATTACHMENTS_DIR, { recursive: true });
+
+  const saved = [];
+  for (const att of parsedAttachments) {
+    const label = (att.filename || 'lampiran').replace(/[\r\n]/g, '').slice(0, 200);
+    const meta = {
+      filename: label,
+      contentType: att.contentType || 'application/octet-stream',
+      size: att.size || att.content?.length || 0
+    };
+
+    if (att.content && att.content.length > 0 && att.content.length <= MAX_ATTACHMENT_BYTES) {
+      try {
+        const storedName = `${crypto.randomUUID()}.bin`;
+        await fs.promises.writeFile(path.join(ATTACHMENTS_DIR, storedName), att.content);
+        meta.storedName = storedName;
+      } catch (err) {
+        console.warn('⚠️ Gagal menyimpan lampiran:', err.message);
+      }
+    } else if (att.content && att.content.length > MAX_ATTACHMENT_BYTES) {
+      meta.skipped = 'Lampiran melebihi 15 MB, tidak disimpan.';
+    }
+
+    saved.push(meta);
+  }
+  return saved;
 }
 
 /**
@@ -47,11 +87,10 @@ export async function processInboundEmail(payload) {
       messageId = parsed.messageId || messageId;
 
       if (parsed.attachments && parsed.attachments.length > 0) {
-        attachments = parsed.attachments.map(att => ({
-          filename: att.filename || 'attachment',
-          contentType: att.contentType,
-          size: att.size
-        }));
+        // Previously only the metadata was kept and the bytes were thrown
+        // away, so attachments could never actually be opened. Now the
+        // content is written to disk and the row stores a path.
+        attachments = await persistAttachments(parsed.attachments);
       }
     } catch (err) {
       console.warn('⚠️ Error parsing raw MIME, fallback to payload fields:', err.message);
@@ -91,6 +130,16 @@ export async function processInboundEmail(payload) {
       category = 'love';
     } else if (aliasName === 'acell' || aliasName === 'acel') {
       category = 'personal';
+    }
+  }
+
+  // Cloudflare retries webhooks on any non-2xx or timeout. Without this check
+  // a single retry duplicated the email in the inbox.
+  if (messageId) {
+    const existing = await getOne(`SELECT id FROM emails WHERE message_id = ?`, [messageId]);
+    if (existing) {
+      console.log(`↩️ Email duplikat diabaikan (message_id: ${messageId})`);
+      return { duplicate: true, emailId: existing.id, shoppingItem: null };
     }
   }
 
@@ -134,8 +183,17 @@ export async function processInboundEmail(payload) {
   if (orderData && (orderData.tracking_number || orderData.trackingNumber || orderData.item_title || orderData.itemTitle)) {
     const shopItemId = `shop_${Date.now()}_${uuidv4().slice(0, 6)}`;
     const platform = orderData.platform || 'Online Store';
-    const courier = orderData.courier || 'Kurir Standar';
     const trackingNumber = orderData.tracking_number || orderData.trackingNumber || 'Belum Ada Resi';
+
+    // A shipper's own confirmation email often names no courier, so the row
+    // used to read "Kurir Ekspedisi" even when the resi format says exactly
+    // which one it is. The AWB pattern is deterministic — trust it over a
+    // placeholder, but never over a courier the email actually stated.
+    const awb = detectCourierFromAwb(trackingNumber);
+    const statedCourier = orderData.courier;
+    const isPlaceholder = !statedCourier ||
+      /^(kurir (standar|ekspedisi)|ekspedisi|unknown|-)$/i.test(statedCourier.trim());
+    const courier = (isPlaceholder && awb.matched) ? awb.courier : (statedCourier || 'Kurir Standar');
     const itemTitle = orderData.item_title || orderData.itemTitle || 'Paket Belanjaan';
     const totalPrice = orderData.total_price || orderData.totalPrice || 0;
     const status = orderData.status || 'shipping';
@@ -147,7 +205,36 @@ export async function processInboundEmail(payload) {
     const aiSummary = aiAnalysis?.summary || `Paket ${platform} dikirim via ${courier}`;
     const trackingUrl = orderData.tracking_url || getCourierTrackingUrl(courier, trackingNumber);
 
-    await run(`
+    // One physical package, one row. A confirmation email plus a shipping
+    // email for the same order used to create two entries with the same resi —
+    // the radar then showed the couple's single package twice.
+    const existing = trackingNumber !== 'Belum Ada Resi'
+      ? await getOne(`SELECT id FROM shopping_items WHERE tracking_number = ?`, [trackingNumber])
+      : null;
+
+    if (existing) {
+      // Link the newer email and fill in fields the first email didn't know,
+      // without overwriting anything already established.
+      await run(`
+        UPDATE shopping_items SET
+          email_id = ?,
+          courier = CASE WHEN courier IN ('Kurir Standar','Kurir Ekspedisi','') OR courier IS NULL
+                         THEN ? ELSE courier END,
+          item_title = CASE WHEN item_title IN ('Paket Belanjaan','') OR item_title IS NULL
+                            THEN ? ELSE item_title END,
+          total_price = CASE WHEN COALESCE(total_price, 0) = 0 THEN ? ELSE total_price END,
+          status = ?,
+          updated_at = datetime('now')
+        WHERE id = ?
+      `, [emailId, courier, itemTitle, totalPrice, status, existing.id]);
+
+      shoppingRecord = {
+        id: existing.id, emailId, platform, courier, trackingNumber,
+        itemTitle, totalPrice, status, merged: true
+      };
+      broadcastEvent('shopping_update', { id: existing.id, trackingNumber });
+    } else {
+      await run(`
       INSERT INTO shopping_items (
         id, email_id, platform, order_id, tracking_number, courier,
         item_title, item_image, total_price, currency, status,
@@ -178,29 +265,30 @@ export async function processInboundEmail(payload) {
       orderData.buyer_name || 'Acell & Haikal'
     ]);
 
-    shoppingRecord = {
-      id: shopItemId,
-      emailId,
-      platform,
-      courier,
-      trackingNumber,
-      itemTitle,
-      totalPrice,
-      status,
-      estimatedDelivery,
-      originCity,
-      destinationCity,
-      timeline: orderData.timeline || [],
-      coordinates: orderData.coordinates || {},
-      aiSummary,
-      trackingUrl
-    };
+      shoppingRecord = {
+        id: shopItemId,
+        emailId,
+        platform,
+        courier,
+        trackingNumber,
+        itemTitle,
+        totalPrice,
+        status,
+        estimatedDelivery,
+        originCity,
+        destinationCity,
+        timeline: orderData.timeline || [],
+        coordinates: orderData.coordinates || {},
+        aiSummary,
+        trackingUrl
+      };
+    }
 
     // Send push notification for Shopping
     await sendPushNotification({
       title: `🛍️ Paket ${platform}: ${courier}`,
       body: `${itemTitle} (Resi: ${trackingNumber})`,
-      data: { type: 'shopping', id: shopItemId, emailId }
+      data: { type: 'shopping', id: shoppingRecord.id, emailId }
     });
   } else if (category === 'love') {
     // Send push notification for Love Letter

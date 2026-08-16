@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   sanctuary-app:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: acel-haikal-sanctuary
+    container_name: acell-haikal-sanctuary
     restart: unless-stopped
     ports:
       - "23625:23625"
@@ -13,7 +11,16 @@ services:
       - PORT=23625
       - NODE_ENV=production
       - ACTIVE_DOMAIN=acellimut.my.id
-      - WEBHOOK_SECRET=couple_secret_token_123
+      # Secrets are NOT written here. This file is committed, so anything in
+      # it is public. The backend generates a random JWT/webhook secret on
+      # first boot and keeps it in the data volume (backend/data/.secrets.json).
+      # To pin your own, put them in docker/.env (gitignored) instead:
+      #   JWT_SECRET=...
+      #   WEBHOOK_SECRET=...
+      #   COURIER_API_KEY=...
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - sanctuary_data:/app/backend/data
 

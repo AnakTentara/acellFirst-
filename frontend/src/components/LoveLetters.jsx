@@ -237,7 +237,7 @@ export default function LoveLetters({
 
       {/* Letter Reader Modal */}
       {selectedLetter && (
-        <div style={{
+        <div className="sheet-scrim" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -296,7 +296,7 @@ export default function LoveLetters({
               lineHeight: 1.8,
               color: '#333',
               fontFamily: 'var(--font-sans)',
-              whiteHeight: 'pre-wrap',
+              whiteSpace: 'pre-wrap',
               maxHeight: '340px',
               overflowY: 'auto',
               marginBottom: '20px'
@@ -346,7 +346,7 @@ export default function LoveLetters({
 
       {/* Write Letter Modal */}
       {showWriteModal && (
-        <div style={{
+        <div className="sheet-scrim" style={{
           position: 'fixed',
           top: 0,
           left: 0,

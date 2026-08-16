@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import MailView from './components/MailView';
@@ -9,26 +9,46 @@ import SettingsModal from './components/SettingsModal';
 import ComposeMailModal from './components/ComposeMailModal';
 import LoginModal from './components/LoginModal';
 
-import { 
-  authApi, 
-  mailApi, 
-  shoppingApi, 
-  loveApi, 
-  wishlistApi, 
-  systemApi, 
-  subscribeToEvents 
+import ErrorBoundary from './components/ErrorBoundary';
+
+import {
+  authApi,
+  mailApi,
+  shoppingApi,
+  loveApi,
+  wishlistApi,
+  systemApi,
+  subscribeToEvents,
+  getToken,
+  getStoredUser,
+  clearSession,
+  setUnauthorizedHandler
 } from './services/api';
 import { playChime, playHeartPop } from './utils/sound';
 import confetti from 'canvas-confetti';
+
+const ANNIVERSARY = '2025-06-23';
+
+function computeDaysTogether(dateStr) {
+  const start = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return '...';
+  const today = new Date();
+  const days = Math.floor((today - start) / 86_400_000);
+  return days >= 0 ? String(days) : '0';
+}
 
 export default function App() {
   // Navigation & UI States
   const [activeTab, setActiveTab] = useState('inbox');
   const [activeMailFolder, setActiveMailFolder] = useState('inbox');
+  const [mailSearch, setMailSearch] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
+  // Start locked. The session check below opens the app only if a stored
+  // token is still valid, so no data is ever fetched before authentication.
+  const [isBooting, setIsBooting] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -56,35 +76,86 @@ export default function App() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // Any 401 anywhere in the app drops straight back to the lock screen
+  // instead of leaving a half-loaded UI behind.
   useEffect(() => {
-    loadInitialData();
+    setUnauthorizedHandler(() => {
+      setCurrentUser(null);
+    });
+  }, []);
 
-    // Subscribe to SSE
+  // Boot: restore an existing session, or show the lock screen.
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setDaysTogether(computeDaysTogether(ANNIVERSARY));
+      await loadProfiles();
+
+      if (!getToken()) {
+        if (!cancelled) setIsBooting(false);
+        return;
+      }
+
+      try {
+        const res = await authApi.me();
+        if (cancelled) return;
+        setCurrentUser(res.user || getStoredUser());
+        await loadInitialData();
+      } catch {
+        // Token expired or revoked.
+        clearSession();
+      } finally {
+        if (!cancelled) setIsBooting(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // SSE only runs while logged in — it needs the token in the URL.
+  useEffect(() => {
+    if (!currentUser) return undefined;
+
     const unsubscribe = subscribeToEvents((event, data) => {
       if (event === 'new_email') {
         playChime();
         showToast('📬 Email Baru Masuk!', `${data.email?.subject} (${data.email?.from_name || data.email?.from_address})`);
         loadEmails();
         loadShopping();
-      } else if (event === 'mail_read_update' || event === 'mail_trash' || event === 'mail_restore' || event === 'mail_deleted') {
+      } else if (
+        event === 'mail_read_update' || event === 'mail_trash' ||
+        event === 'mail_restore' || event === 'mail_spam' ||
+        event === 'mail_deleted' || event === 'outbound_email_sent'
+      ) {
         if (data?.stats) setMailStats(data.stats);
         loadEmails();
-      } else if (event === 'love_letter_received') {
+      } else if (event === 'new_love_letter' || event === 'letter_opened') {
         playHeartPop();
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
-        showToast('💌 Surat Cinta!', `${data.letter?.sender_name} mengirimkan surat baru 💙`);
+        if (event === 'new_love_letter') {
+          showToast('💌 Surat Cinta!', 'Ada surat baru untuk kamu 💙');
+        }
         loadLoveLetters();
-      } else if (event === 'shopping_update') {
+      } else if (event === 'shopping_update' || event === 'shopping_deleted') {
         loadShopping();
+      } else if (event === 'wishlist_update' || event === 'wishlist_deleted') {
+        loadWishlist();
+      } else if (event === 'profile_update') {
+        loadProfiles();
       }
-    }, (connected) => {
-      setIsLiveConnected(connected);
-    });
+    }, setIsLiveConnected);
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, []);
+    return () => { if (unsubscribe) unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
+
+  // Re-query whenever the (already debounced) search term changes.
+  useEffect(() => {
+    if (!currentUser) return;
+    loadEmails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mailSearch]);
 
   const loadInitialData = async () => {
     await Promise.all([
@@ -99,23 +170,38 @@ export default function App() {
 
   const loadProfiles = async () => {
     try {
+      // The endpoint returns `users`, not `profiles` — reading the wrong key
+      // meant the profile list was permanently empty.
       const res = await authApi.getProfiles();
-      if (res.success && res.profiles) {
-        setProfiles(res.profiles);
-        // Default to Haikal or Acell
-        if (!currentUser && res.profiles.length > 0) {
-          const boy = res.profiles.find(p => p.role === 'boy') || res.profiles[0];
-          setCurrentUser(boy);
-        }
+      if (res.success && Array.isArray(res.users)) {
+        setProfiles(res.users);
       }
-    } catch (e) {}
+    } catch { /* offline: lock screen still renders */ }
   };
 
-  const loadEmails = async (folderOverride) => {
+  const loadSystemConfig = async () => {
+    try {
+      const res = await systemApi.getConfig();
+      if (res.success && res.config) {
+        setSystemConfig(res.config);
+        if (res.config.activeDomain) setActiveDomain(res.config.activeDomain);
+        if (res.config.anniversaryDate) {
+          setDaysTogether(computeDaysTogether(res.config.anniversaryDate));
+        }
+      }
+    } catch { /* non-fatal */ }
+  };
+
+  const loadEmails = async (folderOverride, searchOverride) => {
     try {
       const folder = folderOverride || activeMailFolder || 'inbox';
       const role = currentUser?.role || 'boy';
-      const res = await mailApi.getInbox({ folder, role });
+      const search = searchOverride !== undefined ? searchOverride : mailSearch;
+      const params = { folder, role };
+      // Only send the key when there is a term — an empty `search=` would still
+      // add a LIKE '%%' to the query for nothing.
+      if (search) params.search = search;
+      const res = await mailApi.getInbox(params);
       if (res.success) {
         setEmails(res.emails);
         setMailStats(res.stats);
@@ -123,11 +209,19 @@ export default function App() {
     } catch (e) {}
   };
 
+  // Called (debounced) by MailView so search reaches the whole mailbox, not
+  // just the 150 rows already loaded.
+  const handleMailSearch = useCallback((term) => {
+    setMailSearch(prev => (prev === term ? prev : term));
+  }, []);
+
   const handleSelectMailFolder = (folder) => {
     setActiveMailFolder(folder);
     setSelectedEmail(null);
     setEmailShoppingItem(null);
-    loadEmails(folder);
+    // A term left over from the previous folder makes the new one look empty.
+    setMailSearch('');
+    loadEmails(folder, '');
   };
 
   const handleSelectEmail = async (mail) => {
@@ -146,6 +240,11 @@ export default function App() {
       const detail = await mailApi.getMail(mail.id);
       if (detail.success) {
         setEmailShoppingItem(detail.shoppingItem || null);
+        // The row from /inbox is a list summary; only the detail response
+        // carries attachments. Upgrade the open email so the reader sees them.
+        if (detail.email) {
+          setSelectedEmail(prev => (prev && prev.id === mail.id ? { ...prev, ...detail.email } : prev));
+        }
       }
       // 2. Mark as read on backend and sync exact stats
       const readRes = await mailApi.markRead(mail.id, currentUser?.role || 'boy');
@@ -289,41 +388,98 @@ export default function App() {
     loadWishlist();
   };
 
-  const handleSwitchUser = (user) => {
+  // Called by LoginModal after a real, server-verified login.
+  const handleLoginSuccess = (user) => {
     setCurrentUser(user);
-    localStorage.setItem('acel_user_id', user.id);
-    setShowLogin(false);
+    loadInitialData();
   };
+
+  // Switching user now requires the other person's PIN — it can't silently
+  // reuse the current session, which is what made the role check meaningless.
+  const handleSwitchUser = () => {
+    clearSession();
+    setCurrentUser(null);
+    setEmails([]);
+    setSelectedEmail(null);
+  };
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    setIsMobileNavOpen(false);
+  };
+
+  const handleRefreshShopping = async (id) => {
+    try {
+      const res = await shoppingApi.refresh(id);
+      showToast(
+        res.updated ? '🚚 Tracking Diperbarui' : 'ℹ️ Belum Ada Update',
+        res.updated ? `${res.checkpointCount} checkpoint asli tersinkron.` : res.message
+      );
+      loadShopping();
+    } catch (err) {
+      showToast('⚠️ Gagal Sinkron', err.message);
+    }
+  };
+
+  // Locked: render nothing but the lock screen. No data request is made and
+  // no couple content can flash on screen before authentication.
+  if (isBooting) {
+    return (
+      <div className="boot-screen">
+        <div className="boot-heart">💙</div>
+        <p>Membuka sanctuary…</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <LoginModal
+        isOpen={true}
+        profiles={profiles}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    );
+  }
 
   return (
     <div className="app-container">
       {/* Top Header */}
       <TopBar
         currentUser={currentUser}
-        onSwitchUser={() => setShowLogin(true)}
+        onSwitchUser={handleSwitchUser}
         profiles={profiles}
         daysTogether={daysTogether}
         activeDomain={activeDomain}
+        isLiveConnected={isLiveConnected}
         onOpenSettings={() => setShowSettings(true)}
         onSimulateMail={handleSimulateMail}
         onRefresh={loadInitialData}
+        onToggleMobileNav={() => setIsMobileNavOpen((v) => !v)}
       />
 
       {/* Main Grid: Sidebar + Viewport */}
-      <main className={`main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <main className={`main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isMobileNavOpen ? 'mobile-nav-open' : ''}`}>
+        {isMobileNavOpen && (
+          <div className="mobile-nav-scrim" onClick={() => setIsMobileNavOpen(false)} />
+        )}
+
         <Sidebar
           activeTab={activeTab}
-          onSelectTab={setActiveTab}
+          onSelectTab={handleSelectTab}
           activeMailFolder={activeMailFolder}
-          onSelectMailFolder={handleSelectMailFolder}
-          onOpenCompose={() => setShowCompose(true)}
+          onSelectMailFolder={(folder) => { handleSelectMailFolder(folder); setIsMobileNavOpen(false); }}
+          onOpenCompose={() => { setShowCompose(true); setIsMobileNavOpen(false); }}
           mailStats={mailStats}
           shoppingStats={shoppingStats}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isMobileOpen={isMobileNavOpen}
+          onCloseMobile={() => setIsMobileNavOpen(false)}
         />
 
-        <section style={{ height: '100%' }}>
+        <section className="viewport">
+          <ErrorBoundary key={activeTab}>
           {activeTab === 'inbox' && (
             <MailView
               emails={emails}
@@ -338,6 +494,7 @@ export default function App() {
               onPermanentDelete={handlePermanentDelete}
               currentUser={currentUser}
               shoppingItem={emailShoppingItem}
+              onSearch={handleMailSearch}
             />
           )}
 
@@ -348,6 +505,7 @@ export default function App() {
               onUpdateStatus={handleUpdateShoppingStatus}
               onDeleteItem={handleDeleteShoppingItem}
               onAddManual={handleAddManualShopping}
+              onRefreshItem={handleRefreshShopping}
               activeDomain={activeDomain}
             />
           )}
@@ -389,6 +547,7 @@ export default function App() {
               </button>
             </div>
           )}
+          </ErrorBoundary>
         </section>
       </main>
 
@@ -411,33 +570,11 @@ export default function App() {
         currentUser={currentUser}
       />
 
-      <LoginModal
-        isOpen={showLogin}
-        profiles={profiles}
-        onLoginSuccess={handleSwitchUser}
-      />
-
       {/* Toast Notification */}
       {toast && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 92, 138, 0.3)',
-          boxShadow: '0 12px 36px rgba(220, 160, 190, 0.25)',
-          borderRadius: '16px',
-          padding: '14px 20px',
-          zIndex: 99999,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '2px',
-          maxWidth: '360px',
-          animation: 'floatSoft 0.3s ease'
-        }}>
-          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#ff5c8a' }}>{toast.title}</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', lineHeight: 1.4 }}>{toast.message}</div>
+        <div className="app-toast">
+          <div className="app-toast-title">{toast.title}</div>
+          <div className="app-toast-body">{toast.message}</div>
         </div>
       )}
     </div>

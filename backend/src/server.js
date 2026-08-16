@@ -12,28 +12,54 @@ import { loveRouter } from './routes/loveRoutes.js';
 import { wishlistRouter } from './routes/wishlistRoutes.js';
 import { systemRouter } from './routes/systemRoutes.js';
 import { addressRouter } from './routes/addressRoutes.js';
+import { requireAuth, rateLimit } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Middlewares
-app.use(cors({ origin: '*', credentials: true }));
-app.use(express.json({ limit: '25mb' }));
+app.set('trust proxy', 1); // behind Cloudflare / Pterodactyl proxy
+
+// CORS: the SPA is served by this same server, so same-origin is the default.
+// Extra origins (e.g. the Flutter app in dev) come from CORS_ORIGINS.
+app.use(cors({
+  origin: config.corsOrigins.length > 0 ? config.corsOrigins : false,
+  credentials: true
+}));
+
+// Keep the raw body so the webhook can verify an HMAC signature.
+app.use(express.json({
+  limit: '25mb',
+  verify: (req, _res, buf) => { req.rawBody = buf; }
+}));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// Static uploads folder
-app.use('/uploads', express.static(config.uploadsPath));
+// Global throttle — generous for a 2-person app, but stops flooding.
+app.use('/api', rateLimit({ windowMs: 60_000, max: 300 }));
 
-// API Routes
+// Uploaded avatars. nosniff + a restrictive CSP so a file that somehow slips
+// through validation still cannot execute as a page.
+app.use('/uploads', express.static(config.uploadsPath, {
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'");
+    res.setHeader('Content-Disposition', 'inline');
+  }
+}));
+
+// API Routes.
+// authRouter and mailRouter guard themselves per-endpoint because a few of
+// their routes are intentionally public (login, profile list, CF webhook).
 app.use('/api/auth', authRouter);
 app.use('/api/mail', mailRouter);
-app.use('/api/shopping', shoppingRouter);
-app.use('/api/love', loveRouter);
-app.use('/api/wishlist', wishlistRouter);
 app.use('/api/system', systemRouter);
-app.use('/api/addresses', addressRouter);
+
+// Everything below holds private couple data — locked wholesale.
+app.use('/api/shopping', requireAuth, shoppingRouter);
+app.use('/api/love', requireAuth, loveRouter);
+app.use('/api/wishlist', requireAuth, wishlistRouter);
+app.use('/api/addresses', requireAuth, addressRouter);
 
 // Serve Frontend SPA if built
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');

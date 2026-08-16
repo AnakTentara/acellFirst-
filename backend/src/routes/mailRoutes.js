@@ -1,19 +1,23 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import { query, getOne, run } from '../db.js';
 import { config } from '../config.js';
-import { processInboundEmail, sendOutboundEmail } from '../services/mailService.js';
+import { processInboundEmail, sendOutboundEmail, verifySmtpConnection } from '../services/mailService.js';
 import { broadcastEvent } from '../services/pushService.js';
+import { requireAuth, verifyWebhook, rateLimit } from '../middleware/auth.js';
 
 export const mailRouter = express.Router();
 
-// 1. Cloudflare Inbound Webhook
-mailRouter.post('/inbound', async (req, res) => {
+// 1. Cloudflare Inbound Webhook.
+//    verifyWebhook ALWAYS rejects on a bad or missing secret — the previous
+//    version only logged a warning and let the request through, so anyone
+//    could inject mail into the couple's inbox.
+mailRouter.post('/inbound',
+  rateLimit({ windowMs: 60_000, max: 60 }),
+  verifyWebhook,
+  async (req, res) => {
   try {
-    const webhookSecret = req.headers['x-webhook-secret'];
-    if (config.webhookSecret && webhookSecret && webhookSecret !== config.webhookSecret) {
-      console.warn('⚠️ Webhook secret mismatch from inbound request');
-    }
-
     const payload = req.body;
     if (!payload) {
       return res.status(400).json({ error: 'Payload email kosong' });
@@ -48,6 +52,9 @@ async function computeMailStats(userRole = 'boy') {
     sentCount: sentCount?.count || 0
   };
 }
+
+// Everything below reads or mutates private mail — owner only.
+mailRouter.use(requireAuth);
 
 // 2. Get Mail List with folder, search & tag filters
 mailRouter.get('/inbox', async (req, res) => {
@@ -135,7 +142,64 @@ mailRouter.get('/:id', async (req, res) => {
     let aiTags = [];
     try { aiTags = JSON.parse(email.ai_tags_json || '[]'); } catch(e) {}
 
-    res.json({ success: true, email: { ...email, ai_tags: aiTags }, shoppingItem });
+    // Attachments were written to disk by mailService but never sent to the
+    // client, so every attached invoice/PDF was invisible. `storedName` stays
+    // on the server — the UI addresses files by index only.
+    let attachments = [];
+    try {
+      attachments = JSON.parse(email.attachments_json || '[]')
+        .map((att, index) => ({
+          index,
+          filename: att.filename || `lampiran-${index + 1}`,
+          contentType: att.contentType || 'application/octet-stream',
+          size: att.size || 0,
+          available: Boolean(att.storedName),
+          skipped: att.skipped || null
+        }));
+    } catch (e) { /* corrupt row — show the mail without attachments */ }
+
+    res.json({ success: true, email: { ...email, ai_tags: aiTags, attachments }, shoppingItem });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3b. Download one attachment.
+//     Served through this authenticated route rather than the public /uploads
+//     mount: an emailed invoice is private couple data, and a UUID filename is
+//     not an access control.
+mailRouter.get('/:id/attachment/:index', async (req, res) => {
+  try {
+    const { id, index } = req.params;
+    const email = await getOne(`SELECT attachments_json FROM emails WHERE id = ?`, [id]);
+    if (!email) return res.status(404).json({ error: 'Email tidak ditemukan' });
+
+    let attachments = [];
+    try { attachments = JSON.parse(email.attachments_json || '[]'); } catch(e) {}
+
+    const att = attachments[Number(index)];
+    if (!att || !att.storedName) {
+      return res.status(404).json({ error: 'Lampiran tidak tersedia' });
+    }
+
+    // storedName is a UUID we generated; refuse anything that isn't, so a
+    // tampered DB row can never walk out of the attachments folder.
+    if (!/^[0-9a-f-]{36}\.bin$/i.test(att.storedName)) {
+      return res.status(400).json({ error: 'Nama file lampiran tidak valid' });
+    }
+
+    const filePath = path.join(config.uploadsPath, 'attachments', att.storedName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File lampiran sudah tidak ada di server' });
+    }
+
+    // Always download, never render: an attached .html must not run as a page
+    // on our own origin.
+    const safeName = (att.filename || 'lampiran').replace(/["\\\r\n]/g, '_');
+    res.setHeader('Content-Type', att.contentType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -336,11 +400,14 @@ mailRouter.post('/simulate-test', async (req, res) => {
 mailRouter.post('/test-ai', async (req, res) => {
   try {
     const { from, fromName, to, subject, text, apiKey, baseUrl, model } = req.body;
-    
-    // Temporarily set env if provided in request
-    if (apiKey) process.env.AI_API_KEY = apiKey;
-    if (baseUrl) process.env.AI_BASE_URL = baseUrl;
-    if (model) process.env.AI_MODEL = model;
+
+    // Overrides are scoped to THIS request only. The old code assigned them to
+    // process.env permanently, so one call could redirect every future email
+    // analysis to an attacker-controlled endpoint.
+    const overrides = {};
+    if (apiKey) overrides.apiKey = apiKey;
+    if (baseUrl) overrides.baseUrl = baseUrl;
+    if (model) overrides.model = model;
 
     const { analyzeEmailWithAI } = await import('../services/aiService.js');
     const domain = (await getOne(`SELECT value FROM system_settings WHERE key = 'active_domain'`))?.value || config.activeDomain;
@@ -353,11 +420,11 @@ mailRouter.post('/test-ai', async (req, res) => {
       text: text || 'Pesanan Korean Aesthetic Thermal Tumbler telah diserahkan ke kurir SPX Express. Resi: SPXID048192841. Total: Rp 285.000. Estimasi sampai: 18 Agustus 2026.'
     };
 
-    const aiResult = await analyzeEmailWithAI(sampleEmail);
+    const aiResult = await analyzeEmailWithAI(sampleEmail, overrides);
     res.json({
       success: true,
-      modelUsed: process.env.AI_MODEL || 'ohh/gpt-5.6',
-      hasApiKey: Boolean(process.env.AI_API_KEY),
+      modelUsed: overrides.model || config.ai.model,
+      hasApiKey: Boolean(overrides.apiKey || config.ai.apiKey),
       result: aiResult
     });
   } catch (err) {

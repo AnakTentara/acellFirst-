@@ -1,24 +1,28 @@
-import React, { useState } from 'react';
-import { 
-  ShoppingBag, 
-  Truck, 
-  CheckCircle2, 
-  Clock, 
-  Plus, 
-  Copy, 
-  Check, 
-  ExternalLink, 
-  Trash2, 
-  MapPin, 
-  Navigation, 
-  Sparkles, 
-  X, 
-  Package, 
+import React, { useState, useEffect } from 'react';
+import {
+  ShoppingBag,
+  Truck,
+  CheckCircle2,
+  Clock,
+  Plus,
+  Copy,
+  Check,
+  ExternalLink,
+  Trash2,
+  MapPin,
+  Navigation,
+  Sparkles,
+  X,
+  Package,
   Layers,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Info,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { playClick, playHeartPop } from '../utils/sound';
+import { addressApi, shoppingApi } from '../services/api';
 
 export default function ShoppingTracker({
   items,
@@ -26,6 +30,7 @@ export default function ShoppingTracker({
   onUpdateStatus,
   onDeleteItem,
   onAddManual,
+  onRefreshItem,
   activeDomain
 }) {
   const [filterStatus, setFilterStatus] = useState('all');
@@ -35,6 +40,9 @@ export default function ShoppingTracker({
   const [addMode, setAddMode] = useState('scan'); // 'scan' or 'manual'
   const [autoResiInput, setAutoResiInput] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [scanPreview, setScanPreview] = useState(null);
+  const [scanError, setScanError] = useState(null);
+  const [refreshingId, setRefreshingId] = useState(null);
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
 
@@ -47,15 +55,16 @@ export default function ShoppingTracker({
   const [manualNotes, setManualNotes] = useState('');
 
   useEffect(() => {
-    import('../services/api').then(({ addressApi }) => {
-      addressApi.getAddresses().then(res => {
-        if (res.success && res.addresses) {
-          setAddresses(res.addresses);
-          const primary = res.addresses.find(a => a.is_primary === 1);
-          if (primary) setSelectedAddressId(primary.id);
-        }
-      }).catch(() => {});
-    });
+    let cancelled = false;
+    addressApi.getAddresses()
+      .then((res) => {
+        if (cancelled || !res.success || !res.addresses) return;
+        setAddresses(res.addresses);
+        const primary = res.addresses.find((a) => a.is_primary === 1);
+        if (primary) setSelectedAddressId(primary.id);
+      })
+      .catch(() => { /* addresses are optional here */ });
+    return () => { cancelled = true; };
   }, []);
 
   const formatRupiah = (num) => {
@@ -70,25 +79,54 @@ export default function ShoppingTracker({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleAutoScanResi = async (e) => {
+  // Step 1: read-only preview. Shows what the resi actually resolves to
+  // BEFORE anything is written to the database.
+  const handlePreviewResi = async (e) => {
     e.preventDefault();
-    if (!autoResiInput) return;
+    const resi = autoResiInput.trim();
+    if (!resi) return;
+
     setIsScanning(true);
+    setScanError(null);
+    setScanPreview(null);
     try {
-      if (onAddManual) {
-        // Use scanResi or fallback
-        const { shoppingApi } = await import('../services/api');
-        const res = await shoppingApi.scanResi({ trackingNumber: autoResiInput });
-        if (res.success) {
-          setShowAddModal(false);
-          setAutoResiInput('');
-          playHeartPop();
-        }
-      }
+      const res = await shoppingApi.lookupResi(resi);
+      setScanPreview({ ...res.result, alreadyTracked: res.alreadyTracked });
+      playClick();
     } catch (err) {
-      alert('Gagal scan resi: ' + err.message);
+      setScanError(err.message);
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  // Step 2: confirm and save.
+  const handleConfirmScan = async () => {
+    if (!scanPreview) return;
+    setIsScanning(true);
+    try {
+      const res = await shoppingApi.scanResi({ trackingNumber: scanPreview.tracking_number });
+      if (res.success) {
+        setShowAddModal(false);
+        setAutoResiInput('');
+        setScanPreview(null);
+        playHeartPop();
+      }
+    } catch (err) {
+      setScanError(err.message);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleRefresh = async (id) => {
+    if (!onRefreshItem) return;
+    setRefreshingId(id);
+    playClick();
+    try {
+      await onRefreshItem(id);
+    } finally {
+      setRefreshingId(null);
     }
   };
 
@@ -366,7 +404,7 @@ export default function ShoppingTracker({
 
       {/* Live Map & Step Timeline Modal */}
       {selectedMapItem && (
-        <div style={{
+        <div className="sheet-scrim" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -398,112 +436,127 @@ export default function ShoppingTracker({
               <button onClick={() => setSelectedMapItem(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
             </div>
 
-            {/* Simulated Live Apple Map Radar */}
-            <div style={{
-              background: 'linear-gradient(180deg, #f0f7ff 0%, #e0f2fe 100%)',
-              borderRadius: '16px',
-              padding: '24px 20px',
-              border: '1px solid #bfdbfe',
-              position: 'relative',
-              overflow: 'hidden',
-              marginBottom: '20px'
-            }}>
-              {/* Radar Grid Overlay */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2 }}>
-                {/* Origin Hub */}
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#fff', border: '2px solid #2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px auto', boxShadow: '0 4px 12px rgba(37,99,235,0.2)' }}>
-                    <Package size={20} color="#2563eb" />
+            {/* Route map.
+                The courier pin is only drawn when a REAL checkpoint told us
+                where the package is. Previously it was always shown, parked at
+                a hardcoded midpoint — pure decoration presented as tracking. */}
+            <div className="radar-map">
+              <div className="radar-row">
+                <div className="radar-node">
+                  <div className="radar-pin radar-pin-origin">
+                    <Package size={20} />
                   </div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                    {selectedMapItem.origin_city || 'Jakarta (Hub)'}
-                  </div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Warehouse Asal</div>
+                  <div className="radar-city">{selectedMapItem.origin_city || 'Belum diketahui'}</div>
+                  <div className="radar-label">Asal</div>
                 </div>
 
-                {/* Animated Courier Pin in Transit */}
-                <div style={{ textAlign: 'center', flex: 1, padding: '0 12px', position: 'relative' }}>
-                  <div style={{ height: '3px', background: 'linear-gradient(90deg, #2563eb 0%, #0284c7 100%)', width: '100%', position: 'absolute', top: '20px', left: 0, zIndex: 1 }} />
-                  <div style={{ position: 'relative', zIndex: 2, display: 'inline-block' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px auto', boxShadow: '0 0 16px rgba(37,99,235,0.6)' }} className="pulse-cosmic">
-                      <Truck size={18} />
+                <div className="radar-track">
+                  <div className={`radar-line ${selectedMapItem.isEstimate ? 'is-unknown' : ''}`} />
+                  {selectedMapItem.coordinates?.currentIsReal ? (
+                    <div className="radar-current">
+                      <div className="radar-pin radar-pin-truck pulse-cosmic">
+                        <Truck size={18} />
+                      </div>
+                      <div className="radar-chip">
+                        {selectedMapItem.coordinates.current?.name || 'Posisi terakhir'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', background: '#fff', padding: '2px 8px', borderRadius: '999px', border: '1px solid #bfdbfe' }}>
-                      {selectedMapItem.status === 'delivered' ? 'Tiba di Tujuan' : 'Dalam Perjalanan'}
+                  ) : (
+                    <div className="radar-current">
+                      <div className="radar-chip radar-chip-muted">
+                        {selectedMapItem.status === 'delivered' ? 'Sudah sampai' : 'Posisi belum diketahui'}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* Destination Sanctuary */}
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#fff', border: '2px solid #059669', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px auto', boxShadow: '0 4px 12px rgba(5,150,105,0.2)' }}>
-                    <MapPin size={20} color="#059669" />
+                <div className="radar-node">
+                  <div className="radar-pin radar-pin-dest">
+                    <MapPin size={20} />
                   </div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                    {selectedMapItem.destination_city || 'Bandung (Sanctuary)'}
-                  </div>
-                  <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700 }}>Rumah Acell & Haikal</div>
+                  <div className="radar-city">{selectedMapItem.destination_city || 'Sanctuary'}</div>
+                  <div className="radar-label radar-label-home">Rumah Acell &amp; Haikal</div>
                 </div>
               </div>
             </div>
 
-            {/* Checkpoint Step Timeline */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>
-                📍 Riwayat & Estimasi Pengiriman
+            {/* Honest state banner */}
+            {selectedMapItem.isEstimate && (
+              <div className="estimate-banner">
+                <Info size={16} />
+                <div>
+                  <strong>Belum ada checkpoint asli</strong>
+                  <p>
+                    {selectedMapItem.estimateNote ||
+                      'Data checkpoint dari kurir belum tersedia. Yang ditampilkan hanya info yang benar-benar kita tahu: nomor resi, kurir, dan alamat tujuan.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Checkpoint timeline — real checkpoints only */}
+            <div className="timeline-wrap">
+              <div className="timeline-head">
+                <span>📍 Riwayat Pengiriman</span>
+                {onRefreshItem && (
+                  <button
+                    type="button"
+                    className="glass-btn timeline-refresh"
+                    onClick={() => handleRefresh(selectedMapItem.id)}
+                    disabled={refreshingId === selectedMapItem.id}
+                  >
+                    {refreshingId === selectedMapItem.id
+                      ? <Loader2 size={14} className="spin" />
+                      : <RefreshCw size={14} />}
+                    <span>Sinkron</span>
+                  </button>
+                )}
               </div>
 
-              {(selectedMapItem.timeline && selectedMapItem.timeline.length > 0 ? selectedMapItem.timeline : [
-                { step: 1, title: 'Pesanan Dibuat', desc: 'Pesanan telah dibuat di ' + selectedMapItem.platform, time: 'Hari ini', completed: true },
-                { step: 2, title: 'Sedang Dikemas Penjual', desc: 'Barang sedang dipersiapkan', time: 'Hari ini', completed: true },
-                { step: 3, title: 'Diserahkan ke ' + selectedMapItem.courier, desc: 'Nomor Resi: ' + selectedMapItem.tracking_number, time: 'Hari ini', completed: selectedMapItem.status !== 'processing', current: selectedMapItem.status === 'shipping' },
-                { step: 4, title: 'Menuju Alamat', desc: 'Kurir sedang membawa paket ke alamat tujuan', time: selectedMapItem.estimated_delivery || '1-2 Hari', completed: selectedMapItem.status === 'delivered' },
-                { step: 5, title: 'Paket Diterima', desc: 'Paket sampai di tangan Acell & Haikal', time: selectedMapItem.estimated_delivery || 'Estimasi Selesai', completed: selectedMapItem.status === 'delivered', current: selectedMapItem.status === 'delivered' }
-              ]).map((step, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <div style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    background: step.completed ? '#2563eb' : '#e2e8f0',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    marginTop: '2px'
-                  }}>
-                    {step.completed ? <Check size={12} /> : idx + 1}
-                  </div>
-                  <div style={{ flex: 1, paddingBottom: '10px', borderBottom: idx === 4 ? 'none' : '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: step.completed ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                        {step.title}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {step.time}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
-                      {step.desc}
-                    </p>
-                  </div>
+              {(selectedMapItem.timeline || []).length === 0 ? (
+                <div className="timeline-empty">
+                  <Clock size={22} />
+                  <p>
+                    Kurir belum mencatat pergerakan apa pun untuk resi ini.
+                    Kita tidak mengarang perjalanannya — begitu ada checkpoint
+                    asli, langsung muncul di sini.
+                  </p>
+                  <a
+                    href={selectedMapItem.tracking_url || `https://cekresi.com/?noresi=${encodeURIComponent(selectedMapItem.tracking_number || '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Cek manual di situs {selectedMapItem.courier} →
+                  </a>
                 </div>
-              ))}
+              ) : (
+                selectedMapItem.timeline.map((step, idx) => (
+                  <div key={idx} className="timeline-step">
+                    <div className={`timeline-dot ${step.current ? 'is-current' : ''}`}>
+                      {step.current ? <Truck size={12} /> : <Check size={12} />}
+                    </div>
+                    <div className="timeline-body">
+                      <div className="timeline-row">
+                        <span className="timeline-title">{step.title}</span>
+                        <span className="timeline-time">{step.time}</span>
+                      </div>
+                      {step.desc && <p className="timeline-desc">{step.desc}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Official Tracking Link Button */}
-            <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+            <div className="radar-actions">
               <a
                 href={selectedMapItem.tracking_url || `https://cekresi.com/?noresi=${encodeURIComponent(selectedMapItem.tracking_number || '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="glass-btn glass-btn-primary"
-                style={{ flex: 1, textDecoration: 'none', padding: '10px', fontSize: '0.85rem' }}
               >
                 <ExternalLink size={15} />
-                <span>Buka Cek Resi Resmi {selectedMapItem.courier}</span>
+                <span>Cek Resi Resmi {selectedMapItem.courier}</span>
               </a>
             </div>
           </div>
@@ -513,7 +566,7 @@ export default function ShoppingTracker({
       {/* Manual Order Modal */}
       {/* Manual & Auto-Scan Order Modal */}
       {showAddModal && (
-        <div style={{
+        <div className="sheet-scrim" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -574,36 +627,87 @@ export default function ShoppingTracker({
             </div>
 
             {addMode === 'scan' ? (
-              <form onSubmit={handleAutoScanResi} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '12px', fontSize: '0.78rem', color: '#1e40af' }}>
-                  💡 <b>Cukup Masukkan Nomor Resi Saja!</b><br/>
-                  AI akan otomatis mendeteksi ekspedisi (SPX, J&T, SiCepat, Lion Parcel, JNE, POS, Anteraja), rute gudang &rarr; Bandung, dan estimasi waktu sampai.
+              <form onSubmit={handlePreviewResi} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="scan-hint">
+                  💡 <b>Cukup masukkan nomor resi.</b><br />
+                  Kurir dideteksi dari format resi (SPX, J&amp;T, JNE, SiCepat, Anteraja,
+                  Lion Parcel, Ninja, POS). Kita cek dulu, baru disimpan.
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                    Nomor Resi / AWB Paket
-                  </label>
+                  <label className="field-label">Nomor Resi / AWB Paket</label>
                   <input
                     type="text"
                     required
                     value={autoResiInput}
-                    onChange={(e) => setAutoResiInput(e.target.value)}
-                    placeholder="Contoh: SPXID048192841 / JX9827361928 / 0048192841"
-                    className="glass-input"
-                    style={{ fontSize: '0.9rem', fontFamily: 'monospace' }}
+                    onChange={(e) => { setAutoResiInput(e.target.value); setScanPreview(null); }}
+                    placeholder="Contoh: JY1457499661 / SPXID048192841"
+                    className="glass-input mono"
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck="false"
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isScanning}
-                  className="glass-btn glass-btn-primary"
-                  style={{ width: '100%', padding: '12px', fontSize: '0.9rem' }}
-                >
-                  <Sparkles size={16} />
-                  <span>{isScanning ? 'AI Sedang Memindai...' : '⚡ Scan & Tambahkan Paket'}</span>
-                </button>
+                {scanError && <div className="scan-error">{scanError}</div>}
+
+                {/* Preview: exactly what we know, and what we don't. */}
+                {scanPreview && (
+                  <div className="scan-preview">
+                    <div className="scan-preview-row">
+                      <span>Kurir</span>
+                      <strong>
+                        {scanPreview.courierDetected
+                          ? scanPreview.courier
+                          : '⚠️ Tidak dikenali dari format resi'}
+                      </strong>
+                    </div>
+                    <div className="scan-preview-row">
+                      <span>Platform</span>
+                      <strong>{scanPreview.platform || '—'}</strong>
+                    </div>
+                    <div className="scan-preview-row">
+                      <span>Tujuan</span>
+                      <strong>{scanPreview.destination_city || '—'}</strong>
+                    </div>
+                    <div className="scan-preview-row">
+                      <span>Checkpoint asli</span>
+                      <strong>{scanPreview.checkpointCount || 0}</strong>
+                    </div>
+
+                    {scanPreview.isEstimate && (
+                      <div className="scan-preview-note">
+                        <Info size={14} />
+                        <span>{scanPreview.estimateNote}</span>
+                      </div>
+                    )}
+
+                    {scanPreview.alreadyTracked && (
+                      <div className="scan-preview-note is-warn">
+                        <Info size={14} />
+                        <span>Resi ini sudah ada di daftar paket.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!scanPreview ? (
+                  <button type="submit" disabled={isScanning} className="glass-btn glass-btn-primary block-btn">
+                    {isScanning ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                    <span>{isScanning ? 'Mengecek resi…' : 'Cek Resi'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleConfirmScan}
+                    disabled={isScanning || scanPreview.alreadyTracked}
+                    className="glass-btn glass-btn-primary block-btn"
+                  >
+                    <Plus size={16} />
+                    <span>{scanPreview.alreadyTracked ? 'Sudah Dilacak' : 'Simpan ke Daftar Paket'}</span>
+                  </button>
+                )}
               </form>
             ) : (
               <form onSubmit={handleSaveManual} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

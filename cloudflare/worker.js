@@ -1,14 +1,34 @@
 /**
- * Cloudflare Email Routing Worker for Acel & Haikal Sanctuary
- * 
- * Intercepts incoming emails sent to your custom domain (e.g. shopping@acellimut.net, love@acellimut.net, etc.)
- * and forwards the raw MIME content or parsed payload directly to your backend webhook.
+ * Cloudflare Email Routing Worker for Acell & Haikal Sanctuary
+ *
+ * Intercepts incoming emails sent to the couple's aliases (us@, shopping@,
+ * etall@, acell@ acellimut.my.id) and forwards the raw MIME to the backend
+ * webhook.
+ *
+ * SETUP (wajib, sekali saja):
+ *   1. Ambil secret dari server: backend/data/.secrets.json → webhookSecret
+ *   2. Simpan sebagai Secret di Cloudflare (BUKAN plain var):
+ *        npx wrangler secret put WEBHOOK_SECRET
+ *   3. Set WEBHOOK_URL kalau backend tidak di https://acellimut.my.id
  */
 
 export default {
   async email(message, env, ctx) {
     const webhookUrl = env.WEBHOOK_URL || "https://acellimut.my.id/api/mail/inbound";
-    const webhookSecret = env.WEBHOOK_SECRET || "Senin23062025";
+    const webhookSecret = env.WEBHOOK_SECRET;
+
+    // Tidak ada fallback secret di sini. Dulu baris ini berisi 'Senin23062025'
+    // — nilai yang sudah bocor di git history publik — sehingga siapa pun yang
+    // membaca repo bisa menyuntik email palsu ke inbox. Backend sekarang juga
+    // menolak nilai itu, jadi fallback hanya akan bikin email diam-diam gagal.
+    if (!webhookSecret) {
+      console.error(
+        "WEBHOOK_SECRET belum diset di Cloudflare. Jalankan: wrangler secret put WEBHOOK_SECRET"
+      );
+      // Simpan email di antrian Cloudflare daripada dibuang diam-diam.
+      message.setReject("Mail relay belum dikonfigurasi.");
+      return;
+    }
 
     try {
       // Read raw email body as text/MIME
@@ -34,8 +54,13 @@ export default {
       });
 
       if (!response.ok) {
-        console.error(`Failed to forward email to backend. Status: ${response.status}`);
-        // Optionally reject or keep copy
+        // 401 di sini artinya secret di Cloudflare beda dengan yang di server.
+        console.error(
+          `Gagal meneruskan email ke backend. Status: ${response.status}` +
+            (response.status === 401
+              ? " — WEBHOOK_SECRET tidak cocok dengan backend/data/.secrets.json"
+              : "")
+        );
       } else {
         console.log(`Successfully forwarded email to ${webhookUrl}`);
       }
@@ -43,5 +68,5 @@ export default {
       console.error("Error processing email in Cloudflare Worker:", err);
       // Fallback: don't crash email pipeline
     }
-  }
+  },
 };

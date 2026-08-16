@@ -14,8 +14,15 @@ mobile_app/build/
 
 # Database and uploaded media
 backend/data/*.db
+backend/data/*.db-journal
+backend/data/*.db-wal
 backend/data/uploads/*
 !backend/data/uploads/.gitkeep
+
+# Auto-generated JWT & webhook secrets. Committing this file would leak the
+# live secrets exactly the way 'Senin23062025' leaked — it must never be added.
+backend/data/.secrets.json
+docker/.env
 
 # Build outputs
 /dist/

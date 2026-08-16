@@ -14,7 +14,11 @@ import {
   X,
   Zap,
   Code,
-  Settings
+  Settings,
+  Menu,
+  Wifi,
+  WifiOff,
+  LogOut
 } from 'lucide-react';
 import { isSoundEnabled, toggleSound, playClick, playHeartPop } from '../utils/sound';
 import { authApi } from '../services/api';
@@ -27,7 +31,9 @@ export default function TopBar({
   activeDomain, 
   onOpenSettings,
   onSimulateMail,
-  onRefresh
+  onRefresh,
+  isLiveConnected,
+  onToggleMobileNav
 }) {
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -94,10 +100,23 @@ export default function TopBar({
   const partnerUser = profiles.find(p => p.id !== currentUser?.id) || profiles[1];
 
   return (
-    <header className="glass-panel" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+    <header className="glass-panel topbar">
       {/* Brand & Clean Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+        {/* Drawer toggle — only rendered on narrow screens via CSS. */}
+        <button
+          type="button"
+          onClick={() => {
+            playClick();
+            if (onToggleMobileNav) onToggleMobileNav();
+          }}
+          className="glass-btn topbar-burger"
+          aria-label="Buka menu navigasi"
+        >
+          <Menu size={18} />
+        </button>
+
+        <div className="topbar-logo" style={{
           width: '38px',
           height: '38px',
           borderRadius: '12px',
@@ -110,37 +129,46 @@ export default function TopBar({
         }}>
           <Heart size={20} fill="#fff" />
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h1 style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
+            <h1 className="topbar-title" style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
               Acell & Haikal Sanctuary
             </h1>
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: 'var(--brand-blue)', fontWeight: 700 }}>{daysTogether || '...'}</span>
+            {/* daysTogether is a plain number; label it so it isn't a mystery digit */}
+            <span style={{ color: 'var(--brand-blue)', fontWeight: 700 }}>{daysTogether || '...'} hari</span>
             <span style={{ color: 'var(--text-muted)' }}>•</span>
-            <span style={{ color: 'var(--text-muted)' }}>@{activeDomain}</span>
+            <span className="topbar-domain" style={{ color: 'var(--text-muted)' }}>@{activeDomain}</span>
+            <span
+              className="topbar-live"
+              title={isLiveConnected ? 'Terhubung realtime ke server' : 'Realtime terputus — mencoba menyambung lagi'}
+              style={{ color: isLiveConnected ? 'var(--brand-green)' : 'var(--text-muted)' }}
+            >
+              {isLiveConnected ? <Wifi size={13} /> : <WifiOff size={13} />}
+            </span>
           </p>
         </div>
       </div>
 
       {/* Profiles & Clean Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Partner Status Pill */}
+      <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Partner Status Pill — switching now signs out and asks for the
+            other person's PIN, so it's labelled honestly. */}
         {partnerUser && (
-          <div 
-            onClick={() => onSwitchUser(partnerUser)}
-            className="glass-card" 
-            title={`Ganti ke profil ${partnerUser.display_name}`}
+          <div
+            onClick={onSwitchUser}
+            className="glass-card topbar-partner"
+            title={`Keluar dan masuk sebagai ${partnerUser.display_name || partnerUser.displayName}`}
             style={{ padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
           >
             <img
               src={partnerUser.avatar}
-              alt={partnerUser.display_name}
+              alt=""
               style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
             />
             <div style={{ fontSize: '0.78rem', lineHeight: 1.2 }}>
-              <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{partnerUser.display_name}</div>
+              <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{partnerUser.display_name || partnerUser.displayName}</div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{partnerUser.mood || 'Online'}</div>
             </div>
           </div>
@@ -241,6 +269,19 @@ export default function TopBar({
                 <Zap size={14} />
                 <span>Debug & Simulator</span>
               </button>
+
+              {/* The partner pill is hidden on phones, so this is the only
+                  way out of a session on mobile. */}
+              <button
+                onClick={() => {
+                  setShowMenuDropdown(false);
+                  onSwitchUser();
+                }}
+                style={{ width: '100%', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'transparent', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <LogOut size={14} />
+                <span>Keluar / Ganti Akun</span>
+              </button>
             </div>
           )}
         </div>
@@ -248,7 +289,7 @@ export default function TopBar({
 
       {/* Profile & Avatar Customizer Modal */}
       {showProfileModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
+        <div className="sheet-scrim" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', padding: '24px', background: '#ffffff', boxShadow: '0 20px 50px rgba(37,99,235,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>Edit Profil & Foto</h3>
@@ -382,7 +423,7 @@ export default function TopBar({
 
       {/* Debug & Inbound Simulator Modal */}
       {showDebugModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
+        <div className="sheet-scrim" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '24px', background: '#ffffff' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

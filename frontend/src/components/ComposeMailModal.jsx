@@ -65,7 +65,7 @@ export default function ComposeMailModal({
   if (!isOpen) return null;
 
   return (
-    <div style={{
+    <div className="sheet-scrim" style={{
       position: 'fixed',
       top: 0,
       left: 0,

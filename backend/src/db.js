@@ -84,6 +84,27 @@ export const run = async (sql, params = []) => {
   }
 };
 
+/**
+ * Add a column only if it is genuinely missing.
+ *
+ * The old code wrapped every ALTER in `try {} catch (e) {}`, which silently
+ * swallowed real migration failures (disk full, locked db, bad SQL) exactly
+ * the same way it swallowed the expected "duplicate column" error.
+ */
+async function addColumn(table, column, definition) {
+  const existing = await query(`PRAGMA table_info(${table})`);
+  if (existing.some((c) => c.name === column)) return false;
+
+  try {
+    await run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    console.log(`🔧 Migrasi: kolom ${table}.${column} ditambahkan.`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Migrasi GAGAL untuk ${table}.${column}: ${err.message}`);
+    throw err;
+  }
+}
+
 export const initDatabase = async () => {
   await getDbConnection();
 
@@ -134,13 +155,13 @@ export const initDatabase = async () => {
   `);
 
   // Migrations for existing DB files
-  try { await run(`ALTER TABLE emails ADD COLUMN is_outbound INTEGER DEFAULT 0`); } catch (e) {}
-  try { await run(`ALTER TABLE emails ADD COLUMN is_draft INTEGER DEFAULT 0`); } catch (e) {}
-  try { await run(`ALTER TABLE emails ADD COLUMN ai_summary TEXT`); } catch (e) {}
-  try { await run(`ALTER TABLE emails ADD COLUMN ai_sentiment TEXT`); } catch (e) {}
-  try { await run(`ALTER TABLE emails ADD COLUMN is_trash INTEGER DEFAULT 0`); } catch (e) {}
-  try { await run(`ALTER TABLE emails ADD COLUMN is_spam INTEGER DEFAULT 0`); } catch (e) {}
-  try { await run(`ALTER TABLE emails ADD COLUMN ai_tags_json TEXT DEFAULT '[]'`); } catch (e) {}
+  await addColumn('emails', 'is_outbound', 'INTEGER DEFAULT 0');
+  await addColumn('emails', 'is_draft', 'INTEGER DEFAULT 0');
+  await addColumn('emails', 'ai_summary', 'TEXT');
+  await addColumn('emails', 'ai_sentiment', 'TEXT');
+  await addColumn('emails', 'is_trash', 'INTEGER DEFAULT 0');
+  await addColumn('emails', 'is_spam', 'INTEGER DEFAULT 0');
+  await addColumn('emails', 'ai_tags_json', `TEXT DEFAULT '[]'`);
 
   // 3. Shopping Items Table
   await run(`
@@ -170,12 +191,17 @@ export const initDatabase = async () => {
     )
   `);
 
-  try { await run(`ALTER TABLE shopping_items ADD COLUMN origin_city TEXT`); } catch (e) {}
-  try { await run(`ALTER TABLE shopping_items ADD COLUMN destination_city TEXT`); } catch (e) {}
-  try { await run(`ALTER TABLE shopping_items ADD COLUMN timeline_json TEXT DEFAULT '[]'`); } catch (e) {}
-  try { await run(`ALTER TABLE shopping_items ADD COLUMN coordinates_json TEXT DEFAULT '{}'`); } catch (e) {}
-  try { await run(`ALTER TABLE shopping_items ADD COLUMN ai_summary TEXT`); } catch (e) {}
-  try { await run(`ALTER TABLE shopping_items ADD COLUMN tracking_url TEXT`); } catch (e) {}
+  await addColumn('shopping_items', 'origin_city', `TEXT`);
+  await addColumn('shopping_items', 'destination_city', `TEXT`);
+  await addColumn('shopping_items', 'timeline_json', `TEXT DEFAULT '[]'`);
+  await addColumn('shopping_items', 'coordinates_json', `TEXT DEFAULT '{}'`);
+  await addColumn('shopping_items', 'ai_summary', `TEXT`);
+  await addColumn('shopping_items', 'tracking_url', `TEXT`);
+  // Honesty flags: is this real courier data, or an admitted estimate?
+  await addColumn('shopping_items', 'is_estimate', `INTEGER DEFAULT 1`);
+  await addColumn('shopping_items', 'tracking_source', `TEXT DEFAULT 'local'`);
+  await addColumn('shopping_items', 'last_synced_at', `TEXT`);
+  await addColumn('shopping_items', 'address_id', `TEXT`);
 
   // 4. Love Letters Table
   await run(`
@@ -241,7 +267,31 @@ export const initDatabase = async () => {
     )
   `);
 
-  try { await run(`ALTER TABLE shopping_items ADD COLUMN address_id TEXT`); } catch (e) {}
+  // Indexes. The schema previously had ZERO — every folder switch, stat
+  // count, and resi lookup was a full table scan.
+  const indexes = [
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id) WHERE message_id IS NOT NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_emails_created ON emails(created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_emails_folder ON emails(is_trash, is_spam, is_archived, is_outbound)`,
+    `CREATE INDEX IF NOT EXISTS idx_emails_category ON emails(category)`,
+    `CREATE INDEX IF NOT EXISTS idx_emails_alias ON emails(alias_name)`,
+    `CREATE INDEX IF NOT EXISTS idx_shopping_tracking ON shopping_items(tracking_number)`,
+    `CREATE INDEX IF NOT EXISTS idx_shopping_status ON shopping_items(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_shopping_email ON shopping_items(email_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_letters_recipient ON love_letters(recipient_id, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_wishlist_bought ON wishlist_items(is_bought)`,
+    `CREATE INDEX IF NOT EXISTS idx_addresses_primary ON addresses(is_primary)`
+  ];
+
+  for (const sql of indexes) {
+    try {
+      await run(sql);
+    } catch (err) {
+      // A pre-existing duplicate message_id would block the UNIQUE index.
+      // Report it rather than hiding it — but don't block startup.
+      console.warn(`⚠️ Index dilewati: ${err.message}`);
+    }
+  }
 
   // Seed 2 default couple addresses if empty
   const addressCount = await getOne(`SELECT COUNT(*) as count FROM addresses`);
@@ -380,40 +430,64 @@ export const initDatabase = async () => {
     ]);
   }
 
-  // Seed real package JY1457499661 if not exists
-  const realPackage = await getOne(`SELECT id FROM shopping_items WHERE tracking_number = 'JY1457499661'`);
+  // Seed the couple's real in-flight package (J&T, resi JY1457499661).
+  //
+  // Runs in the background: a slow or unreachable courier API must never
+  // delay server startup, which is what the old blocking `await` here did.
+  const realPackage = await getOne(
+    `SELECT id FROM shopping_items WHERE tracking_number = 'JY1457499661'`
+  );
   if (!realPackage) {
-    const { scanTrackingNumberWithAI } = await import('./services/aiService.js');
-    const orderData = await scanTrackingNumberWithAI('JY1457499661');
-
-    await run(`
-      INSERT INTO shopping_items (
-        id, platform, order_id, tracking_number, courier, item_title,
-        item_image, total_price, currency, status, estimated_delivery,
-        origin_city, destination_city, timeline_json, coordinates_json,
-        ai_summary, tracking_url, notes, buyer_name, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IDR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `, [
-      'shop_real_jy1457499661',
-      orderData.platform,
-      '#ORD-JY1457499661',
-      'JY1457499661',
-      orderData.courier,
-      orderData.item_title,
-      'https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop&q=80',
-      0,
-      'shipping',
-      orderData.estimated_delivery || '1-3 Hari Kerja',
-      orderData.origin_city || 'Jakarta Barat',
-      orderData.destination_city || 'Bandung',
-      JSON.stringify(orderData.timeline || []),
-      JSON.stringify(orderData.coordinates || {}),
-      'Paket Real J&T Cargo/Express sedang dalam perjalanan menuju Sanctuary Acell & Haikal',
-      orderData.tracking_url,
-      'Paket Real Haikal & Acell (Cek Resi Langsung)',
-      'Haikal & Acell'
-    ]);
+    seedRealPackage('JY1457499661').catch((err) =>
+      console.warn('⚠️ Seed paket JY1457499661 dilewati:', err.message)
+    );
   }
 
   console.log('✅ Database initialized and synced with acellimut.my.id!');
 };
+
+async function seedRealPackage(resi) {
+  const { scanTrackingNumberWithAI } = await import('./services/aiService.js');
+  const data = await scanTrackingNumberWithAI(resi);
+
+  await run(`
+    INSERT INTO shopping_items (
+      id, platform, order_id, tracking_number, courier, item_title,
+      item_image, total_price, currency, status, estimated_delivery,
+      origin_city, destination_city, timeline_json, coordinates_json,
+      ai_summary, tracking_url, notes, buyer_name, address_id,
+      is_estimate, tracking_source, last_synced_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IDR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `, [
+    'shop_real_jy1457499661',
+    data.platform,
+    `#ORD-${resi}`,
+    resi,
+    data.courier,
+    data.item_title,
+    null,
+    data.total_price,
+    data.status || 'shipping',
+    data.estimated_delivery,
+    data.origin_city,
+    data.destination_city,
+    JSON.stringify(data.timeline || []),
+    JSON.stringify(data.coordinates || {}),
+    data.isEstimate
+      ? `Paket asli Haikal & Acell. ${data.estimateNote}`
+      : `Paket asli Haikal & Acell — tersinkron dari ${data.courier} (${data.checkpointCount} checkpoint).`,
+    data.tracking_url,
+    'Paket real Haikal & Acell',
+    'Haikal & Acell',
+    data.addressId,
+    data.isEstimate ? 1 : 0,
+    data.trackingSource,
+    data.lastSyncedAt
+  ]);
+
+  console.log(
+    data.isEstimate
+      ? `📦 Paket ${resi} ditambahkan (mode estimasi — API kurir belum aktif).`
+      : `📦 Paket ${resi} ditambahkan dengan ${data.checkpointCount} checkpoint asli.`
+  );
+}

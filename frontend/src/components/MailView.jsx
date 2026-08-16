@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, 
   Star, 
@@ -18,9 +18,13 @@ import {
   Tag,
   AlertOctagon,
   RotateCcw,
-  Send
+  Send,
+  Paperclip,
+  Download
 } from 'lucide-react';
 import { playClick, playHeartPop } from '../utils/sound';
+import { sanitizeEmailHtml } from '../utils/sanitize';
+import { mailApi } from '../services/api';
 
 export default function MailView({
   emails,
@@ -34,10 +38,28 @@ export default function MailView({
   onMarkSpam,
   onPermanentDelete,
   currentUser,
-  shoppingItem
+  shoppingItem,
+  onSearch
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedResi, setCopiedResi] = useState(false);
+  const [downloadingAtt, setDownloadingAtt] = useState(null);
+
+  // Email HTML comes from strangers on the internet. Clean it once per email
+  // instead of on every keystroke in the search box.
+  const safeHtml = useMemo(
+    () => sanitizeEmailHtml(selectedEmail?.html_body),
+    [selectedEmail?.id, selectedEmail?.html_body]
+  );
+
+  // The list only holds the 150 newest mails, so filtering it locally can
+  // never find an older one. Ask the server too — debounced, because every
+  // keystroke would otherwise be a query.
+  useEffect(() => {
+    if (!onSearch) return;
+    const timer = setTimeout(() => onSearch(searchTerm.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm, onSearch]);
 
   // Keyboard shortcut: ESC to go back to list
   useEffect(() => {
@@ -63,6 +85,26 @@ export default function MailView({
 
     return true;
   });
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  const handleDownloadAttachment = async (att) => {
+    if (!att.available || !selectedEmail) return;
+    playClick();
+    setDownloadingAtt(att.index);
+    try {
+      await mailApi.downloadAttachment(selectedEmail.id, att.index, att.filename);
+    } catch (e) {
+      alert(e.message || 'Lampiran gagal diunduh.');
+    } finally {
+      setDownloadingAtt(null);
+    }
+  };
 
   const handleCopyResi = (resi) => {
     if (!resi) return;
@@ -158,7 +200,7 @@ export default function MailView({
                     playClick();
                     onSelectEmail(mail);
                   }}
-                  className="glass-card"
+                  className="glass-card mail-row"
                   style={{
                     padding: '14px 18px',
                     display: 'flex',
@@ -234,7 +276,7 @@ export default function MailView({
                         <span style={{ fontSize: '0.84rem', fontWeight: isUnread ? 700 : 500, color: isUnread ? 'var(--text-main)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {mail.subject}
                         </span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="mail-snippet" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           — {(mail.text_body || '').slice(0, 70)}
                         </span>
                       </div>
@@ -286,7 +328,7 @@ export default function MailView({
             </div>
 
             {/* Actions: Star, Trash, Spam, Restore, Delete */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="mail-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -498,12 +540,44 @@ export default function MailView({
           }}>
             {selectedEmail.html_body ? (
               <div
-                dangerouslySetInnerHTML={{ __html: selectedEmail.html_body }}
-                style={{ overflowX: 'auto' }}
+                className="mail-html-body"
+                dangerouslySetInnerHTML={{ __html: safeHtml }}
               />
             ) : (
               <div style={{ whiteSpace: 'pre-wrap' }}>
                 {selectedEmail.text_body}
+              </div>
+            )}
+
+            {/* Attachments were saved to disk on arrival but never shown.
+                They are fetched with the session token, not a plain link. */}
+            {(selectedEmail.attachments || []).length > 0 && (
+              <div className="mail-attachments">
+                <div className="field-label" style={{ marginBottom: '8px' }}>
+                  <Paperclip size={13} style={{ verticalAlign: '-2px' }} /> {selectedEmail.attachments.length} Lampiran
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {selectedEmail.attachments.map((att) => (
+                    <button
+                      key={att.index}
+                      type="button"
+                      className="glass-card attachment-chip"
+                      disabled={!att.available || downloadingAtt === att.index}
+                      title={att.available ? `Unduh ${att.filename}` : (att.skipped || 'File tidak tersimpan di server')}
+                      onClick={() => handleDownloadAttachment(att)}
+                    >
+                      <Paperclip size={14} />
+                      <span className="attachment-name">{att.filename}</span>
+                      <span className="attachment-size">{formatBytes(att.size)}</span>
+                      {att.available && <Download size={13} />}
+                    </button>
+                  ))}
+                </div>
+                {selectedEmail.attachments.some(a => !a.available) && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    Lampiran abu-abu tidak tersimpan di server (biasanya lebih dari 15 MB).
+                  </div>
+                )}
               </div>
             )}
           </div>

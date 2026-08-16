@@ -2,7 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { query, getOne, run } from '../db.js';
 import { broadcastEvent } from '../services/pushService.js';
-import { getCityCoordinates } from '../services/aiService.js';
+import { getCityCoordinatesOrDefault } from '../services/geoService.js';
 
 export const addressRouter = express.Router();
 
@@ -25,8 +25,10 @@ addressRouter.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Label, Nama Penerima, Alamat Lengkap, dan Kota wajib diisi' });
     }
 
-    // Auto-compute coordinates from city
-    const geo = getCityCoordinates(city);
+    // Auto-compute coordinates from city. Unknown cities fall back to the
+    // Bandung sanctuary rather than throwing — getCityCoordinates() now
+    // returns null instead of silently pretending every city is Bandung.
+    const geo = getCityCoordinatesOrDefault(city);
     const id = `addr_${Date.now()}_${uuidv4().slice(0, 5)}`;
 
     if (is_primary) {

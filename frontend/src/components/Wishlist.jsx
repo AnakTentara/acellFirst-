@@ -272,7 +272,7 @@ export default function Wishlist({
 
       {/* Add Wish Modal */}
       {showAddModal && (
-        <div style={{
+        <div className="sheet-scrim" style={{
           position: 'fixed',
           top: 0,
           left: 0,

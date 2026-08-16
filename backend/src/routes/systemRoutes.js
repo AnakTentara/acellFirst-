@@ -2,11 +2,12 @@ import express from 'express';
 import { query, getOne, run } from '../db.js';
 import { config } from '../config.js';
 import { registerSSEClient, broadcastEvent } from '../services/pushService.js';
+import { requireAuth, decodeToken } from '../middleware/auth.js';
 
 export const systemRouter = express.Router();
 
 // 1. Get System & Domain Configuration
-systemRouter.get('/config', async (req, res) => {
+systemRouter.get('/config', requireAuth, async (req, res) => {
   try {
     // Check if domain override exists in DB
     const domainSetting = await getOne(`SELECT value FROM system_settings WHERE key = 'active_domain'`);
@@ -30,7 +31,11 @@ systemRouter.get('/config', async (req, res) => {
         anniversaryDate: config.anniversaryDate,
         allowedAliases: config.allowedAliases,
         webhookUrl: `https://${currentActiveDomain}/api/mail/inbound`,
-        webhookSecret: config.webhookSecret
+        // The secret itself is NEVER returned here — it used to be, to any
+        // anonymous caller. Use GET /api/system/webhook-secret instead.
+        hasWebhookSecret: Boolean(config.webhookSecret),
+        hasCourierApiKey: Boolean(config.courier.apiKey),
+        hasAiApiKey: Boolean(config.ai.apiKey)
       },
       stats: {
         emails: emailStats?.count || 0,
@@ -44,8 +49,19 @@ systemRouter.get('/config', async (req, res) => {
   }
 });
 
+// 1b. Reveal the webhook secret to a logged-in owner only.
+//     Needed when configuring the Cloudflare Email Worker.
+systemRouter.get('/webhook-secret', requireAuth, (req, res) => {
+  res.json({
+    success: true,
+    webhookSecret: config.webhookSecret,
+    header: 'x-webhook-secret',
+    note: 'Tempelkan nilai ini sebagai header x-webhook-secret di Cloudflare Email Worker.'
+  });
+});
+
 // 2. Switch Active Domain (Instant without code change!)
-systemRouter.post('/domain', async (req, res) => {
+systemRouter.post('/domain', requireAuth, async (req, res) => {
   try {
     const { newDomain } = req.body;
     if (!newDomain) {
@@ -53,6 +69,12 @@ systemRouter.post('/domain', async (req, res) => {
     }
 
     const cleanDomain = newDomain.trim().toLowerCase();
+
+    // Reject anything that isn't a plain hostname — this value gets
+    // interpolated into URLs and email addresses.
+    if (!/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(cleanDomain)) {
+      return res.status(400).json({ error: 'Format domain tidak valid.' });
+    }
 
     await run(`
       INSERT INTO system_settings (key, value, updated_at)
@@ -76,7 +98,7 @@ systemRouter.post('/domain', async (req, res) => {
 });
 
 // 3. Generate Cloudflare DNS Records Guide
-systemRouter.get('/dns-guide', async (req, res) => {
+systemRouter.get('/dns-guide', requireAuth, async (req, res) => {
   try {
     const domainSetting = await getOne(`SELECT value FROM system_settings WHERE key = 'active_domain'`);
     const domain = domainSetting?.value || config.activeDomain;
@@ -128,15 +150,32 @@ systemRouter.get('/dns-guide', async (req, res) => {
   }
 });
 
-// 4. Real-time Server-Sent Events (SSE) stream
+// 4. Real-time Server-Sent Events (SSE) stream.
+//    EventSource cannot set headers, so the token arrives as ?token=...
 systemRouter.get('/events', (req, res) => {
+  const user = decodeToken(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Sesi tidak valid untuk stream real-time.' });
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // don't let nginx buffer the stream
   res.flushHeaders();
 
   // Send initial connection packet
   res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', time: new Date().toISOString() })}\n\n`);
+
+  // Heartbeat: without this, Cloudflare/nginx silently drop an idle stream
+  // after ~60s and "Live" quietly stops being live.
+  const heartbeat = setInterval(() => {
+    try { res.write(`: keepalive\n\n`); } catch { clearInterval(heartbeat); }
+  }, 25_000);
+
+  const stop = () => clearInterval(heartbeat);
+  req.on('close', stop);
+  req.on('error', stop);
 
   registerSSEClient(res);
 });

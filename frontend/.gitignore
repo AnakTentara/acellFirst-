@@ -8,9 +8,15 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
 dist-ssr
 *.local
+
+# NOTE: `dist` is deliberately NOT ignored.
+# The production server (Pterodactyl) deploys with `git pull` and serves
+# frontend/dist directly. This file used to ignore `dist`, while some old
+# bundles were already committed — so every rebuild was invisible to git and
+# production kept serving a stale bundle whose asset hashes no longer matched
+# index.html. That is a white screen, and it is silent.
 
 # Editor directories and files
 .vscode/*
