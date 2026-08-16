@@ -117,11 +117,10 @@ systemRouter.get('/dns-guide', async (req, res) => {
       dnsRecords,
       webhookEndpoint: `https://${domain}/api/mail/inbound`,
       sampleAliases: [
+        `us@${domain}`,
         `shopping@${domain}`,
-        `love@${domain}`,
-        `acel@${domain}`,
-        `haikal@${domain}`,
-        `surat@${domain}`
+        `etall@${domain}`,
+        `acell@${domain}`
       ]
     });
   } catch (err) {

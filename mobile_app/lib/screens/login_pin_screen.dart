@@ -34,16 +34,16 @@ class _LoginPinScreenState extends State<LoginPinScreen> {
       setState(() {
         _profiles = [
           {
-            'id': 'user_acel',
-            'displayName': 'Acel',
-            'nickname': 'My Girl 💖',
+            'id': 'user_acell',
+            'displayName': 'Acell',
+            'nickname': 'Princess 👑',
             'role': 'girl',
             'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
           },
           {
             'id': 'user_haikal',
             'displayName': 'Haikal',
-            'nickname': 'My Boy 💙',
+            'nickname': 'Prince 👑',
             'role': 'boy',
             'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
           }

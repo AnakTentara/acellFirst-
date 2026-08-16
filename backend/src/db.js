@@ -200,10 +200,10 @@ export const initDatabase = async () => {
     )
   `);
 
-  // Automatic Migration: Scrub old domains and ensure active_domain = acellimut.my.id
+  // Automatic Migration: Scrub old domains, update nicknames to Prince & Princess, and ensure active_domain = acellimut.my.id
   await run(`UPDATE system_settings SET value = 'acellimut.my.id' WHERE key = 'active_domain'`);
-  await run(`UPDATE users SET display_name = 'Acell', username = 'acell' WHERE role = 'girl'`);
-  await run(`UPDATE users SET display_name = 'Haikal', username = 'haikal' WHERE role = 'boy'`);
+  await run(`UPDATE users SET display_name = 'Acell', username = 'acell', nickname = 'Princess 👑' WHERE role = 'girl'`);
+  await run(`UPDATE users SET display_name = 'Haikal', username = 'haikal', nickname = 'Prince 👑' WHERE role = 'boy'`);
 
   // Seed default users if not exists
   const boyUser = await getOne(`SELECT * FROM users WHERE username = ?`, ['haikal']);
@@ -216,7 +216,7 @@ export const initDatabase = async () => {
       'user_haikal',
       'haikal',
       config.boyName || 'Haikal',
-      config.boyNickname || 'My Boy 💙',
+      config.boyNickname || 'Prince 👑',
       'boy',
       'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
       pinHashHaikal,
@@ -234,7 +234,7 @@ export const initDatabase = async () => {
       'user_acell',
       'acell',
       config.girlName || 'Acell',
-      config.girlNickname || 'My Girl 💙',
+      config.girlNickname || 'Princess 👑',
       'girl',
       'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
       pinHashAcell,
@@ -267,16 +267,15 @@ export const initDatabase = async () => {
           <h2 style="margin: 0; font-size: 20px;">🌌 Acell & Haikal Sanctuary</h2>
           <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">acellimut.my.id • Private Couple Ecosystem</p>
         </div>
-        <p>Hai <b>Acell</b> & <b>Haikal</b>,</p>
+        <p>Hai <b>Princess Acell</b> & <b>Prince Haikal</b>,</p>
         <p>Sekarang kita sudah punya email privat resmi dengan domain <b>acellimut.my.id</b> untuk belanja bersama dan berbagi momen romantis!</p>
         <div style="background: #eff6ff; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #bfdbfe;">
-          <p style="margin: 0; color: #1e40af; font-weight: 700; font-size: 14px;">📬 Alamat Email Aktif Kita:</p>
+          <p style="margin: 0; color: #1e40af; font-weight: 700; font-size: 14px;">📬 4 Alamat Email Resmi Kita:</p>
           <ul style="margin-top: 8px; margin-bottom: 0; padding-left: 20px; font-size: 13px; color: #1e293b;">
             <li><code>us@acellimut.my.id</code> — Email bersama & Couple Inbox</li>
             <li><code>shopping@acellimut.my.id</code> — Khusus belanja (Shopee, Tokped, TikTok Shop)</li>
             <li><code>etall@acellimut.my.id</code> — Layanan & Tagihan bersama</li>
-            <li><code>acell@acellimut.my.id</code> — Email pribadi Acell</li>
-            <li><code>haikal@acellimut.my.id</code> — Email pribadi Haikal</li>
+            <li><code>acell@acellimut.my.id</code> — Email pribadi Princess Acell</li>
           </ul>
         </div>
         <p style="font-size: 14px; color: #475569;">I love you to the stars and back! 🌌✨</p>

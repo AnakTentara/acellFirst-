@@ -15,11 +15,11 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'Senin23062025',
   webhookSecret: process.env.WEBHOOK_SECRET || 'Senin23062025',
 
-  // Couple Profile
+  // Couple Names
   boyName: process.env.BOY_NAME || 'Haikal',
-  boyNickname: process.env.BOY_NICKNAME || 'My Boy 💙',
+  boyNickname: process.env.BOY_NICKNAME || 'Prince 👑',
   girlName: process.env.GIRL_NAME || 'Acell',
-  girlNickname: process.env.GIRL_NICKNAME || 'My Girl 💖',
+  girlNickname: process.env.GIRL_NICKNAME || 'Princess 👑',
   anniversaryDate: process.env.ANNIVERSARY_DATE || '2025-06-23', // 23 Juni 2025
 
   // Dynamic Domain System
@@ -27,19 +27,12 @@ export const config = {
   stagingDomain: process.env.STAGING_DOMAIN || 'acellimut.my.id',
   primaryDomain: process.env.PRIMARY_DOMAIN || 'acellimut.my.id',
   
-  // Custom Aliases
+  // Custom Aliases (us, etall, acell, shopping)
   allowedAliases: [
     'us',
     'shopping',
     'etall',
-    'acell',
-    'love',
-    'surat',
-    'haikal',
-    'secret',
-    'order',
-    'receipts',
-    'bills'
+    'acell'
   ],
 
   // Storage paths

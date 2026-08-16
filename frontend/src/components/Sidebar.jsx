@@ -141,7 +141,7 @@ export default function Sidebar({
           <span>Alias Email Resmi:</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {['us@', 'shopping@', 'etall@', 'acell@', 'haikal@'].map(a => (
+          {['us@', 'shopping@', 'etall@', 'acell@'].map(a => (
             <span key={a} style={{ background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
               {a}
             </span>

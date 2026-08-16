@@ -100,26 +100,26 @@ export default function LoginModal({
                   cursor: 'pointer',
                   borderRadius: '16px',
                   border: isSel 
-                    ? `2px solid ${isBoy ? '#3a86ff' : '#ff5c8a'}` 
-                    : '1px solid rgba(0,0,0,0.06)',
+                    ? `2px solid ${isBoy ? '#2563eb' : '#0284c7'}` 
+                    : '1px solid rgba(219, 234, 254, 0.8)',
                   background: isSel 
-                    ? (isBoy ? '#f0f5ff' : '#fff0f5') 
+                    ? (isBoy ? '#eff6ff' : '#f0f9ff') 
                     : '#fff',
                   transform: isSel ? 'scale(1.02)' : 'scale(1)',
-                  boxShadow: isSel ? '0 8px 20px rgba(220, 180, 205, 0.25)' : 'none',
+                  boxShadow: isSel ? '0 8px 24px rgba(37, 99, 235, 0.2)' : 'none',
                   transition: 'all 0.2s ease'
                 }}
               >
                 <img
                   src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
                   alt={user.displayName}
-                  style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 8px auto', display: 'block', border: `2px solid ${isBoy ? '#3a86ff' : '#ff5c8a'}` }}
+                  style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 8px auto', display: 'block', border: `2px solid ${isBoy ? '#2563eb' : '#0284c7'}` }}
                 />
                 <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   {user.displayName}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: isBoy ? '#3a86ff' : '#ff5c8a', fontWeight: 700, marginTop: '2px' }}>
-                  {user.nickname}
+                <div style={{ fontSize: '0.74rem', color: isBoy ? '#2563eb' : '#0284c7', fontWeight: 800, marginTop: '2px' }}>
+                  {isBoy ? 'Prince 👑' : 'Princess 👑'}
                 </div>
               </div>
             );

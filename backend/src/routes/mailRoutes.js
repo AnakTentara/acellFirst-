@@ -232,14 +232,14 @@ mailRouter.post('/simulate-test', async (req, res) => {
       };
     } else {
       payload = {
-        from: `haikal@${domain}`,
-        fromName: 'Haikal (My Boy 💙)',
+        from: `us@${domain}`,
+        fromName: 'Prince Haikal 👑',
         to: `us@${domain}`,
         subject: 'Cuma mau bilang, I love you to the stars and back! 🌌💙',
         text: 'Jangan lupa senyum dan makan yang teratur ya sayang! Nanti malem kita telfonan yaa 🥰',
         html: `<div style="font-family: sans-serif; padding: 24px; background: #f0f7ff; border-radius: 16px; color: #1e293b; border: 1px solid #bfdbfe;">
           <h3 style="color: #2563eb;">Cuma mau bilang... 💙</h3>
-          <p>Hai Acell cantik! Makasih udah selalu jadi orang yang paling bikin aku semangat setiap hari.</p>
+          <p>Hai Princess Acell! Makasih udah selalu jadi orang yang paling bikin aku semangat setiap hari.</p>
           <p>Semoga harimu menyenangkan dan jangan lupa istirahat ya! Love you always! 🌌✨</p>
         </div>`
       };

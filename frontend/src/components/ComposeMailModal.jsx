@@ -9,8 +9,8 @@ export default function ComposeMailModal({
   activeDomain,
   currentUser
 }) {
-  const [fromAlias, setFromAlias] = useState(currentUser?.role === 'boy' ? 'haikal' : 'acel');
-  const [to, setTo] = useState(`love@${activeDomain}`);
+  const [fromAlias, setFromAlias] = useState(currentUser?.role === 'girl' ? 'acell' : 'us');
+  const [to, setTo] = useState(`us@${activeDomain}`);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -19,8 +19,7 @@ export default function ComposeMailModal({
     { id: 'us', label: `us@${activeDomain}`, desc: 'Email Kita Berdua / Couple' },
     { id: 'shopping', label: `shopping@${activeDomain}`, desc: 'Khusus Belanja & Resi' },
     { id: 'etall', label: `etall@${activeDomain}`, desc: 'Belanja & Layanan Bersama' },
-    { id: 'acell', label: `acell@${activeDomain}`, desc: 'Email Pribadi Acell' },
-    { id: 'haikal', label: `haikal@${activeDomain}`, desc: 'Email Pribadi Haikal' }
+    { id: 'acell', label: `acell@${activeDomain}`, desc: 'Email Pribadi Princess Acell' }
   ];
 
   const presets = [
@@ -148,7 +147,7 @@ export default function ComposeMailModal({
               className="glass-input"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              placeholder={`love@${activeDomain} atau email pasangan`}
+              placeholder={`us@${activeDomain} atau email tujuan`}
             />
           </div>
 
