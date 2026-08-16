@@ -46,7 +46,7 @@ The webapp is bound to exactly **4 official couple email aliases**:
 - Inbound emails arrive via Cloudflare Email Routing & Webhook (`/api/mail/webhook`).
 - **AI Intelligence**:
   - Provider: **OhhMyAgent.com** (`https://ohhmyagent.com/v1`)
-  - Model: `ohh/gpt-5.6` or `ohh/claude-opus-5`
+  - Model: `ohh/gpt-5.6` or `ohh/opus-5`
   - *Important Parameter Note*: Reasoning models do not support `temperature: 0.2`. Omit or use default `1`.
   - AI auto-categorizes incoming emails (`shopping`, `love`, `personal`), generates 2-line summaries, smart tags (`#Shopee`, `#SPX`, `#Fashion`), and extracts courier tracking numbers.
 
