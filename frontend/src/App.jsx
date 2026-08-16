@@ -114,7 +114,8 @@ export default function App() {
   const loadEmails = async (folderOverride) => {
     try {
       const folder = folderOverride || activeMailFolder || 'inbox';
-      const res = await mailApi.getInbox({ folder });
+      const role = currentUser?.role || 'boy';
+      const res = await mailApi.getInbox({ folder, role });
       if (res.success) {
         setEmails(res.emails);
         setMailStats(res.stats);
@@ -155,9 +156,14 @@ export default function App() {
   };
 
   const handleToggleStar = async (id) => {
-    const res = await mailApi.toggleStar(id);
-    if (res?.stats) setMailStats(res.stats);
-    loadEmails();
+    // 1. Instant optimistic update
+    setEmails(prev => prev.map(m => m.id === id ? { ...m, is_starred: m.is_starred === 1 ? 0 : 1 } : m));
+    setSelectedEmail(prev => prev && prev.id === id ? { ...prev, is_starred: prev.is_starred === 1 ? 0 : 1 } : prev);
+
+    try {
+      const res = await mailApi.toggleStar(id);
+      if (res?.stats) setMailStats(res.stats);
+    } catch (e) {}
   };
 
   const handleMoveToTrash = async (id) => {

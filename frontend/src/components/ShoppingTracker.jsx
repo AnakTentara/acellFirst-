@@ -35,6 +35,8 @@ export default function ShoppingTracker({
   const [addMode, setAddMode] = useState('scan'); // 'scan' or 'manual'
   const [autoResiInput, setAutoResiInput] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
 
   // Form states for manual order
   const [manualTitle, setManualTitle] = useState('');
@@ -43,6 +45,18 @@ export default function ShoppingTracker({
   const [manualResi, setManualResi] = useState('');
   const [manualPrice, setManualPrice] = useState('');
   const [manualNotes, setManualNotes] = useState('');
+
+  useEffect(() => {
+    import('../services/api').then(({ addressApi }) => {
+      addressApi.getAddresses().then(res => {
+        if (res.success && res.addresses) {
+          setAddresses(res.addresses);
+          const primary = res.addresses.find(a => a.is_primary === 1);
+          if (primary) setSelectedAddressId(primary.id);
+        }
+      }).catch(() => {});
+    });
+  }, []);
 
   const formatRupiah = (num) => {
     if (!num) return 'Rp 0';
@@ -670,6 +684,24 @@ export default function ShoppingTracker({
                       style={{ fontSize: '0.85rem' }}
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Alamat Tujuan Sanctuary
+                  </label>
+                  <select
+                    value={selectedAddressId}
+                    onChange={(e) => setSelectedAddressId(e.target.value)}
+                    className="glass-input"
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    {addresses.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.label} ({a.city}) {a.is_primary ? '⭐ Utama' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

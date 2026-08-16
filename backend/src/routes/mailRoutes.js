@@ -27,11 +27,12 @@ mailRouter.post('/inbound', async (req, res) => {
   }
 });
 
-// Helper to compute fresh mail stats
-async function computeMailStats() {
-  const unreadTotal = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_trash = 0 AND is_spam = 0 AND is_outbound = 0 AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
-  const unreadShopping = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'shopping' AND is_trash = 0 AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
-  const unreadLove = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'love' AND is_trash = 0 AND (is_read_by_boy = 0 OR is_read_by_girl = 0)`);
+// Helper to compute fresh mail stats based on user role
+async function computeMailStats(userRole = 'boy') {
+  const readCol = userRole === 'girl' ? 'is_read_by_girl' : 'is_read_by_boy';
+  const unreadTotal = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_trash = 0 AND is_spam = 0 AND is_outbound = 0 AND ${readCol} = 0`);
+  const unreadShopping = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'shopping' AND is_trash = 0 AND ${readCol} = 0`);
+  const unreadLove = await getOne(`SELECT COUNT(*) as count FROM emails WHERE category = 'love' AND is_trash = 0 AND ${readCol} = 0`);
   const trashCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_trash = 1`);
   const spamCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_spam = 1`);
   const starredCount = await getOne(`SELECT COUNT(*) as count FROM emails WHERE is_starred = 1 AND is_trash = 0`);
@@ -51,7 +52,7 @@ async function computeMailStats() {
 // 2. Get Mail List with folder, search & tag filters
 mailRouter.get('/inbox', async (req, res) => {
   try {
-    const { folder, category, alias, search, tag } = req.query;
+    const { folder, category, alias, search, tag, role } = req.query;
     let sql = `SELECT * FROM emails WHERE is_archived = 0`;
     const params = [];
 
@@ -109,7 +110,7 @@ mailRouter.get('/inbox', async (req, res) => {
       return { ...mail, ai_tags: aiTags };
     });
 
-    const stats = await computeMailStats();
+    const stats = await computeMailStats(role || 'boy');
 
     res.json({
       success: true,
@@ -146,15 +147,13 @@ mailRouter.patch('/:id/read', async (req, res) => {
     const { id } = req.params;
     const { role } = req.body; // 'boy' or 'girl'
 
-    if (role === 'boy') {
-      await run(`UPDATE emails SET is_read_by_boy = 1 WHERE id = ?`, [id]);
-    } else if (role === 'girl') {
+    if (role === 'girl') {
       await run(`UPDATE emails SET is_read_by_girl = 1 WHERE id = ?`, [id]);
     } else {
-      await run(`UPDATE emails SET is_read_by_boy = 1, is_read_by_girl = 1 WHERE id = ?`, [id]);
+      await run(`UPDATE emails SET is_read_by_boy = 1 WHERE id = ?`, [id]);
     }
 
-    const stats = await computeMailStats();
+    const stats = await computeMailStats(role || 'boy');
     broadcastEvent('mail_read_update', { id, role, stats });
     res.json({ success: true, stats });
   } catch (err) {

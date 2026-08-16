@@ -80,10 +80,18 @@ export const wishlistApi = {
   deleteItem: (id) => request(`/api/wishlist/${id}`, { method: 'DELETE' })
 };
 
-// 6. System & Domain API
+// 6. Address API (Couple Delivery Addresses)
+export const addressApi = {
+  getAddresses: () => request('/api/addresses'),
+  addAddress: (data) => request('/api/addresses', { method: 'POST', body: JSON.stringify(data) }),
+  setPrimary: (id) => request(`/api/addresses/${id}/primary`, { method: 'PATCH' }),
+  deleteAddress: (id) => request(`/api/addresses/${id}`, { method: 'DELETE' })
+};
+
+// 7. System & Domain API
 export const systemApi = {
   getConfig: () => request('/api/system/config'),
-  switchDomain: (newDomain) => request('/api/system/domain', { method: 'POST', body: JSON.stringify({ newDomain }) }),
+  switchDomain: (newDomain) => request('/api/system/domain', { method: 'POST', body: JSON.stringify(newDomain ? { newDomain } : {}) }),
   getDnsGuide: () => request('/api/system/dns-guide'),
   getHealth: () => request('/api/system/health')
 };

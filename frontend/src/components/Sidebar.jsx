@@ -175,7 +175,7 @@ export default function Sidebar({
                 {!isCollapsed && <span>{folder.label}</span>}
               </div>
 
-              {folder.badge ? (
+              {folder.badge && Number(folder.badge) > 0 ? (
                 <span style={{
                   background: isSelected ? 'var(--brand-blue)' : '#e2e8f0',
                   color: isSelected ? '#fff' : 'var(--text-main)',
@@ -240,7 +240,7 @@ export default function Sidebar({
                 {!isCollapsed && <span>{tab.label}</span>}
               </div>
 
-              {tab.badge ? (
+              {tab.badge && Number(tab.badge) > 0 ? (
                 <span style={{
                   background: 'var(--brand-blue)',
                   color: '#fff',

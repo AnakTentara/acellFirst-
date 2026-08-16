@@ -11,6 +11,7 @@ import { shoppingRouter } from './routes/shoppingRoutes.js';
 import { loveRouter } from './routes/loveRoutes.js';
 import { wishlistRouter } from './routes/wishlistRoutes.js';
 import { systemRouter } from './routes/systemRoutes.js';
+import { addressRouter } from './routes/addressRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +33,7 @@ app.use('/api/shopping', shoppingRouter);
 app.use('/api/love', loveRouter);
 app.use('/api/wishlist', wishlistRouter);
 app.use('/api/system', systemRouter);
+app.use('/api/addresses', addressRouter);
 
 // Serve Frontend SPA if built
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');

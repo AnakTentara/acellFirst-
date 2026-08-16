@@ -223,6 +223,62 @@ export const initDatabase = async () => {
     )
   `);
 
+  // 7. Couple Addresses Table
+  await run(`
+    CREATE TABLE IF NOT EXISTS addresses (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      label TEXT NOT NULL,
+      recipient_name TEXT NOT NULL,
+      phone_number TEXT,
+      full_address TEXT NOT NULL,
+      city TEXT NOT NULL,
+      latitude REAL DEFAULT -6.9175,
+      longitude REAL DEFAULT 107.6191,
+      is_primary INTEGER DEFAULT 0,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  try { await run(`ALTER TABLE shopping_items ADD COLUMN address_id TEXT`); } catch (e) {}
+
+  // Seed 2 default couple addresses if empty
+  const addressCount = await getOne(`SELECT COUNT(*) as count FROM addresses`);
+  if (addressCount && addressCount.count === 0) {
+    await run(`
+      INSERT INTO addresses (id, label, recipient_name, phone_number, full_address, city, latitude, longitude, is_primary, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      'addr_bandung',
+      'Sanctuary Utama Bandung 🏠',
+      'Princess Acell & Prince Haikal',
+      '0812-2306-2025',
+      'Jl. Ir. H. Juanda (Dago) No. 23, Coblong, Kota Bandung, Jawa Barat 40135',
+      'Bandung',
+      -6.9175,
+      107.6191,
+      1,
+      'Alamat Utama Pengiriman Sanctuary Acell & Haikal'
+    ]);
+
+    await run(`
+      INSERT INTO addresses (id, label, recipient_name, phone_number, full_address, city, latitude, longitude, is_primary, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      'addr_jakarta',
+      'Sanctuary Kedua Jakarta 🏢',
+      'Prince Haikal & Princess Acell',
+      '0812-2306-2025',
+      'Jl. Jend. Sudirman Kav. 52-53, Senayan, Kebayoran Baru, Jakarta Selatan 12190',
+      'Jakarta Selatan',
+      -6.2088,
+      106.8456,
+      0,
+      'Alamat Alternatif Rumah Prince Haikal'
+    ]);
+  }
+
   // Automatic Migration: Scrub old domains, update nicknames to Prince & Princess, and ensure active_domain = acellimut.my.id
   await run(`UPDATE system_settings SET value = 'acellimut.my.id' WHERE key = 'active_domain'`);
   await run(`UPDATE users SET display_name = 'Acell', username = 'acell', nickname = 'Princess 👑' WHERE role = 'girl'`);
