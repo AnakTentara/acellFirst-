@@ -73,7 +73,7 @@ export function parseReceiptEmail(email) {
 
   const courierPatterns = [
     { name: 'SPX Express', regex: /spx|shopee express/i, resiRegex: /(SPX[A-Z0-9]{8,20})/i },
-    { name: 'J&T Express', regex: /j&t|jnt|jet express/i, resiRegex: /(Jx[0-9]{8,16}|JP[0-9]{8,16}|[0-9]{12})/i },
+    { name: 'J&T Express / J&T Cargo', regex: /j&t|jnt|jet express|jt cargo|j&t cargo/i, resiRegex: /(JY[0-9]{8,16}|Jx[0-9]{8,16}|JP[0-9]{8,16}|JZ[0-9]{8,16}|JS[0-9]{8,16}|JD[0-9]{8,16}|[0-9]{12})/i },
     { name: 'SiCepat Express', regex: /sicepat/i, resiRegex: /(00[0-9]{10,14})/i },
     { name: 'Lion Parcel', regex: /lion parcel|lionparcel/i, resiRegex: /(LP[0-9]{8,14}|[0-9]{11,15})/i },
     { name: 'Anteraja', regex: /anteraja/i, resiRegex: /(1000[0-9]{8,14})/i },

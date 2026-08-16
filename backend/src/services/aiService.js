@@ -263,7 +263,7 @@ export async function scanTrackingNumberWithAI(rawInput) {
 
   // Extract resi if user pasted multi-line text
   const spxMatch = cleanInput.match(/(SPX[A-Z0-9]{8,20})/i);
-  const jntMatch = cleanInput.match(/(Jx[0-9]{8,16}|JP[0-9]{8,16}|[0-9]{12})/i);
+  const jntMatch = cleanInput.match(/(JY[0-9]{8,16}|Jx[0-9]{8,16}|JP[0-9]{8,16}|JZ[0-9]{8,16}|JS[0-9]{8,16}|JD[0-9]{8,16}|[0-9]{12})/i);
   const sicepatMatch = cleanInput.match(/(00[0-9]{10,14})/i);
   const lionMatch = cleanInput.match(/(LP[0-9]{8,14}|[0-9]{11,15})/i);
   const anterajaMatch = cleanInput.match(/(1000[0-9]{8,14})/i);
@@ -277,7 +277,7 @@ export async function scanTrackingNumberWithAI(rawInput) {
     platform = 'Shopee';
     resi = spxMatch[1];
   } else if (jntMatch && !cleanInput.startsWith('00') && !cleanInput.startsWith('1000')) {
-    courier = 'J&T Express';
+    courier = cleanInput.toUpperCase().startsWith('JY') ? 'J&T Cargo / J&T Express' : 'J&T Express';
     platform = /tiktok/i.test(cleanInput) ? 'TikTok Shop' : 'Shopee / Tokopedia';
     resi = jntMatch[1];
   } else if (sicepatMatch) {

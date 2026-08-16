@@ -324,5 +324,40 @@ export const initDatabase = async () => {
     ]);
   }
 
+  // Seed real package JY1457499661 if not exists
+  const realPackage = await getOne(`SELECT id FROM shopping_items WHERE tracking_number = 'JY1457499661'`);
+  if (!realPackage) {
+    const { scanTrackingNumberWithAI } = await import('./services/aiService.js');
+    const orderData = await scanTrackingNumberWithAI('JY1457499661');
+
+    await run(`
+      INSERT INTO shopping_items (
+        id, platform, order_id, tracking_number, courier, item_title,
+        item_image, total_price, currency, status, estimated_delivery,
+        origin_city, destination_city, timeline_json, coordinates_json,
+        ai_summary, tracking_url, notes, buyer_name, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'IDR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [
+      'shop_real_jy1457499661',
+      orderData.platform,
+      '#ORD-JY1457499661',
+      'JY1457499661',
+      orderData.courier,
+      orderData.item_title,
+      'https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop&q=80',
+      0,
+      'shipping',
+      orderData.estimated_delivery || '1-3 Hari Kerja',
+      orderData.origin_city || 'Jakarta Barat',
+      orderData.destination_city || 'Bandung',
+      JSON.stringify(orderData.timeline || []),
+      JSON.stringify(orderData.coordinates || {}),
+      'Paket Real J&T Cargo/Express sedang dalam perjalanan menuju Sanctuary Acell & Haikal',
+      orderData.tracking_url,
+      'Paket Real Haikal & Acell (Cek Resi Langsung)',
+      'Haikal & Acell'
+    ]);
+  }
+
   console.log('✅ Database initialized and synced with acellimut.my.id!');
 };
