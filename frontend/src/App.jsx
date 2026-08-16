@@ -154,9 +154,6 @@ export default function App() {
       if (res.success) {
         setEmails(res.emails);
         setMailStats(res.stats);
-        if (res.emails.length > 0 && !selectedEmail) {
-          handleSelectEmail(res.emails[0]);
-        }
       }
     } catch (e) {}
   };
@@ -313,6 +310,7 @@ export default function App() {
               emails={emails}
               selectedEmail={selectedEmail}
               onSelectEmail={handleSelectEmail}
+              onBackToList={() => setSelectedEmail(null)}
               onToggleStar={handleToggleStar}
               onDeleteMail={handleDeleteMail}
               currentUser={currentUser}

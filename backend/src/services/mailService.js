@@ -225,7 +225,7 @@ export async function processInboundEmail(payload) {
     shopping: shoppingRecord
   });
 
-  return { emailId, category, receiptData, success: true };
+  return { emailId, category, orderData, shoppingRecord, success: true };
 }
 
 /**

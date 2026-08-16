@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Star, 
@@ -11,10 +11,13 @@ import {
   Copy, 
   Check, 
   Truck, 
-  Clock, 
-  DollarSign,
+  ArrowLeft,
   Sparkles,
-  Inbox
+  Inbox,
+  Clock,
+  Tag,
+  ShieldCheck,
+  Send
 } from 'lucide-react';
 import { playClick, playHeartPop } from '../utils/sound';
 
@@ -22,6 +25,7 @@ export default function MailView({
   emails,
   selectedEmail,
   onSelectEmail,
+  onBackToList,
   onToggleStar,
   onDeleteMail,
   currentUser,
@@ -31,9 +35,20 @@ export default function MailView({
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedResi, setCopiedResi] = useState(false);
 
+  // Keyboard shortcut: ESC to go back to list
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedEmail) {
+        onBackToList();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedEmail, onBackToList]);
+
   const categories = [
     { id: 'all', label: 'Semua', icon: Inbox },
-    { id: 'shopping', label: '🛍️ Belanja', icon: ShoppingBag },
+    { id: 'shopping', label: '🛍️ Belanja & Resi', icon: ShoppingBag },
     { id: 'love', label: '💌 Surat Cinta', icon: Heart },
     { id: 'personal', label: '👤 Personal', icon: User },
     { id: 'sent', label: '📤 Terkirim', icon: Mail },
@@ -47,7 +62,7 @@ export default function MailView({
     } else if (filterCategory === 'sent') {
       if (mail.is_outbound !== 1) return false;
     } else if (filterCategory !== 'all') {
-      if (mail.is_outbound === 1) return false; // hide outbound from general inbox filter unless 'sent' or 'all'
+      if (mail.is_outbound === 1) return false;
       if (mail.category !== filterCategory) return false;
     }
 
@@ -92,69 +107,70 @@ export default function MailView({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: '16px', height: '100%' }}>
-      {/* Left List Pane */}
-      <div className="glass-panel" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', height: '100%', minHeight: '600px' }}>
-        {/* Search Input */}
-        <div style={{ position: 'relative' }}>
-          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-          <input
-            type="text"
-            className="glass-input"
-            style={{ paddingLeft: '36px', paddingRight: '12px', fontSize: '0.85rem' }}
-            placeholder="Cari email, resi, pengirim..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+    <div style={{ position: 'relative', width: '100%', minHeight: '600px', overflow: 'hidden' }}>
+      {/* 1. LIST VIEW (Sliding out to the left when email is opened) */}
+      <div style={{
+        width: '100%',
+        display: selectedEmail ? 'none' : 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        animation: 'fadeIn 0.2s ease'
+      }}>
+        {/* Top Search & Filter Bar */}
+        <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 260px' }}>
+              <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Cari email, pengirim, produk, atau nomor resi..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="glass-input"
+                style={{ paddingLeft: '40px', fontSize: '0.86rem' }}
+              />
+            </div>
+
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              <span>{filteredEmails.length} Pesan</span>
+            </div>
+          </div>
+
+          {/* Filter Pills */}
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
+            {categories.map((cat) => {
+              const Icon = cat.icon;
+              const isSel = filterCategory === cat.id;
+
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    playClick();
+                    setFilterCategory(cat.id);
+                  }}
+                  className={`glass-pill ${isSel ? 'active' : ''}`}
+                  style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                >
+                  <Icon size={13} />
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Category Pills */}
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => {
-                playClick();
-                setFilterCategory(cat.id);
-              }}
-              className={`glass-pill ${filterCategory === cat.id ? 'active' : ''}`}
-              style={{ fontSize: '0.78rem', padding: '5px 10px', whiteSpace: 'nowrap' }}
-            >
-              <span>{cat.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Email Items List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+        {/* Email Cards List */}
+        <div className="glass-panel" style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {filteredEmails.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
-              <Mail size={36} color="#ffd1dc" style={{ marginBottom: '8px' }} />
-              <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Tidak ada email</p>
-              <p style={{ fontSize: '0.75rem' }}>Gunakan simulator di sidebar untuk tes email masuk</p>
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+              <Inbox size={48} color="#93c5fd" style={{ marginBottom: '12px' }} />
+              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>Kotak Masuk Bersih</h4>
+              <p style={{ fontSize: '0.82rem' }}>Tidak ada email di kategori ini.</p>
             </div>
           ) : (
             filteredEmails.map((mail) => {
-              const isSelected = selectedEmail?.id === mail.id;
-              const isRead = currentUser?.role === 'boy' ? mail.is_read_by_boy : mail.is_read_by_girl;
-
-              let badgeBg = '#f0f5ff';
-              let badgeColor = '#3a86ff';
-              let badgeText = 'General';
-
-              if (mail.category === 'shopping') {
-                badgeBg = '#fff0eb';
-                badgeColor = '#ee4d2d';
-                badgeText = '🛍️ Belanja';
-              } else if (mail.category === 'love') {
-                badgeBg = '#fff0f5';
-                badgeColor = '#ff5c8a';
-                badgeText = '💌 Surat Cinta';
-              } else if (mail.category === 'personal') {
-                badgeBg = '#f6f0ff';
-                badgeColor = '#8338ec';
-                badgeText = '👤 Personal';
-              }
+              const isUnread = currentUser?.role === 'girl' ? mail.is_read_by_girl === 0 : mail.is_read_by_boy === 0;
 
               return (
                 <div
@@ -165,72 +181,82 @@ export default function MailView({
                   }}
                   className="glass-card"
                   style={{
-                    padding: '12px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '14px',
                     cursor: 'pointer',
-                    position: 'relative',
-                    borderColor: isSelected ? 'rgba(255, 92, 138, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                    background: isSelected 
-                      ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 240, 246, 0.95) 100%)' 
-                      : !isRead ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)',
-                    boxShadow: isSelected ? '0 6px 20px rgba(255, 92, 138, 0.18)' : 'none'
+                    borderRadius: '14px',
+                    background: isUnread ? '#ffffff' : 'rgba(255, 255, 255, 0.65)',
+                    borderLeft: isUnread ? '4px solid var(--brand-blue)' : '1px solid rgba(219, 234, 254, 0.7)',
+                    transition: 'all 0.18s ease'
                   }}
                 >
-                  {!isRead && (
-                    <span style={{
-                      position: 'absolute',
-                      left: '4px',
-                      top: '14px',
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: '#ff5c8a'
-                    }} />
-                  )}
+                  {/* Left: Star + Sender + Subject + Snippet */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playClick();
+                        onToggleStar(mail.id);
+                      }}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+                      title={mail.is_starred ? 'Hapus Bintang' : 'Beri Bintang'}
+                    >
+                      <Star
+                        size={17}
+                        color={mail.is_starred ? '#eab308' : '#cbd5e1'}
+                        fill={mail.is_starred ? '#eab308' : 'none'}
+                      />
+                    </button>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{
-                      fontSize: '0.82rem',
-                      fontWeight: !isRead ? 800 : 600,
-                      color: 'var(--text-main)',
-                      maxWidth: '180px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                    {/* Sender Avatar */}
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '12px',
+                      background: mail.category === 'shopping' ? '#eff6ff' : mail.category === 'love' ? '#f0f9ff' : '#f8fafc',
+                      color: mail.category === 'shopping' ? '#2563eb' : mail.category === 'love' ? '#0284c7' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      flexShrink: 0,
+                      border: '1px solid rgba(219, 234, 254, 0.8)'
                     }}>
-                      {mail.from_name || mail.from_address}
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {formatDate(mail.created_at)}
-                    </span>
+                      {mail.category === 'shopping' ? <ShoppingBag size={17} /> : mail.category === 'love' ? <Heart size={17} /> : (mail.from_name || mail.from_address || 'M')[0].toUpperCase()}
+                    </div>
+
+                    {/* Content Preview */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: isUnread ? 800 : 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {mail.from_name || mail.from_address}
+                        </span>
+
+                        {mail.alias_name && (
+                          <span style={{ fontSize: '0.68rem', background: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                            {mail.alias_name}@
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: isUnread ? 700 : 500, color: isUnread ? 'var(--text-main)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {mail.subject}
+                        </span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          — {(mail.text_body || '').slice(0, 70)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div style={{
-                    fontSize: '0.85rem',
-                    fontWeight: !isRead ? 700 : 500,
-                    color: !isRead ? '#000' : 'var(--text-secondary)',
-                    marginBottom: '6px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {mail.subject}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                    <span style={{
-                      background: badgeBg,
-                      color: badgeColor,
-                      padding: '2px 8px',
-                      borderRadius: '999px',
-                      fontSize: '0.68rem',
-                      fontWeight: 700
-                    }}>
-                      {badgeText}
-                    </span>
-
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.03)', padding: '2px 6px', borderRadius: '4px' }}>
-                      to: {mail.alias_name}@
-                    </span>
+                  {/* Right: Date */}
+                  <div style={{ fontSize: '0.74rem', color: isUnread ? 'var(--brand-blue)' : 'var(--text-muted)', fontWeight: isUnread ? 700 : 500, flexShrink: 0 }}>
+                    {formatDate(mail.created_at)}
                   </div>
                 </div>
               );
@@ -239,160 +265,199 @@ export default function MailView({
         </div>
       </div>
 
-      {/* Right Detail Pane */}
-      <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '600px' }}>
-        {selectedEmail ? (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '16px' }}>
-            {/* Header / Actions */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '14px', gap: '12px' }}>
-              <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)', marginBottom: '6px' }}>
-                  {selectedEmail.subject}
-                </h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                  <div>
-                    Dari: <b>{selectedEmail.from_name || selectedEmail.from_address}</b> &lt;{selectedEmail.from_address}&gt;
-                  </div>
-                  <span>•</span>
-                  <div>
-                    Kepada: <code style={{ background: '#fff0f5', color: '#ff5c8a', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>{selectedEmail.to_address}</code>
-                  </div>
-                  <span>•</span>
-                  <span>{formatDate(selectedEmail.created_at)}</span>
-                </div>
-              </div>
+      {/* 2. FULL EMAIL READER (Sliding in smoothly with Back button) */}
+      {selectedEmail && (
+        <div className="glass-panel" style={{
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          minHeight: '650px',
+          background: '#ffffff',
+          animation: 'slideInFromRight 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          {/* Top Action Toolbar with Back Button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  playClick();
+                  onBackToList();
+                }}
+                className="glass-btn glass-btn-primary"
+                style={{ padding: '8px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '12px' }}
+                title="Kembali ke Kotak Masuk (Tekan Esc)"
+              >
+                <ArrowLeft size={16} />
+                <span>Kembali</span>
+              </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  onClick={() => {
-                    playHeartPop();
-                    onToggleStar(selectedEmail.id);
-                  }}
-                  className="glass-btn"
-                  style={{ padding: '8px', width: '36px', height: '36px' }}
-                  title="Tandai Bintang"
-                >
-                  <Star size={18} color={selectedEmail.is_starred === 1 ? '#ffb703' : '#888'} fill={selectedEmail.is_starred === 1 ? '#ffb703' : 'none'} />
-                </button>
-                <button
-                  onClick={() => {
-                    playClick();
-                    onDeleteMail(selectedEmail.id);
-                  }}
-                  className="glass-btn"
-                  style={{ padding: '8px', width: '36px', height: '36px' }}
-                  title="Hapus / Arsipkan"
-                >
-                  <Trash2 size={18} color="#e63946" />
-                </button>
-              </div>
+              <span style={{ fontSize: '0.75rem', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '8px', fontWeight: 700, textTransform: 'uppercase' }}>
+                {selectedEmail.category === 'shopping' ? '🛍️ Resi Belanja' : selectedEmail.category === 'love' ? '💌 Surat Cinta' : '📬 Pesan Masuk'}
+              </span>
             </div>
 
-            {/* Smart Shopping Breakout Card (If Detected) */}
-            {shoppingItem && (
-              <div className="glass-card" style={{
-                padding: '16px',
-                background: 'linear-gradient(135deg, rgba(255, 245, 240, 0.85) 0%, rgba(255, 255, 255, 0.95) 100%)',
-                border: '1px solid rgba(255, 122, 0, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '14px',
-                boxShadow: '0 8px 24px rgba(255, 122, 0, 0.08)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <img
-                    src={shoppingItem.item_image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=150'}
-                    alt="Product"
-                    style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', border: '1px solid rgba(0,0,0,0.1)' }}
-                  />
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                      <span style={{ background: '#ee4d2d', color: '#fff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
-                        {shoppingItem.platform}
-                      </span>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        Order {shoppingItem.order_id}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      {shoppingItem.item_title}
-                    </div>
-                    <div style={{ fontSize: '0.82rem', color: '#ee4d2d', fontWeight: 800, marginTop: '2px' }}>
-                      {formatRupiah(shoppingItem.total_price)}
-                    </div>
+            {/* Actions: Star, Delete */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  playClick();
+                  onToggleStar(selectedEmail.id);
+                }}
+                className="glass-btn"
+                style={{ padding: '7px 12px', fontSize: '0.8rem', color: selectedEmail.is_starred ? '#eab308' : 'var(--text-secondary)' }}
+                title="Beri Bintang"
+              >
+                <Star size={15} fill={selectedEmail.is_starred ? '#eab308' : 'none'} />
+                <span>{selectedEmail.is_starred ? 'Berbintang' : 'Bintang'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  playClick();
+                  onDeleteMail(selectedEmail.id);
+                  onBackToList();
+                }}
+                className="glass-btn"
+                style={{ padding: '7px 12px', fontSize: '0.8rem', color: '#dc2626' }}
+                title="Hapus Email"
+              >
+                <Trash2 size={15} />
+                <span>Hapus</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Email Subject Heading */}
+          <div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text-main)', lineHeight: 1.3, marginBottom: '12px' }}>
+              {selectedEmail.subject}
+            </h2>
+
+            {/* Sender & Recipient Meta Card */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                  {(selectedEmail.from_name || selectedEmail.from_address || 'M')[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                    {selectedEmail.from_name || selectedEmail.from_address}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Dari: <code>{selectedEmail.from_address}</code> • Tujuan: <code>{selectedEmail.to_address}</code>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Clock size={14} />
+                <span>{formatDate(selectedEmail.created_at)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Intelligence Summary Pill */}
+          {selectedEmail.ai_summary && (
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Sparkles size={18} color="#2563eb" />
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+                  ✨ Analisis AI OhhMyAgent (GPT-5.6)
+                </div>
+                <div style={{ fontSize: '0.84rem', color: '#1e293b', marginTop: '2px' }}>
+                  {selectedEmail.ai_summary}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Shopping Order Highlight Box (if receipt) */}
+          {shoppingItem && (
+            <div style={{
+              background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+              border: '1px solid #bae6fd',
+              borderRadius: '16px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Truck size={18} color="#0284c7" />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0369a1' }}>
+                    Informasi Pengiriman ({shoppingItem.platform})
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0284c7' }}>
+                  {formatRupiah(shoppingItem.total_price)}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '12px 14px', borderRadius: '12px', border: '1px solid #bfdbfe', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    Kurir: <b>{shoppingItem.courier}</b> • Estimasi: <b>{shoppingItem.estimated_delivery}</b>
+                  </div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-main)' }}>
+                    {shoppingItem.tracking_number}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      Kurir: <b>{shoppingItem.courier}</b>
-                    </div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--text-main)' }}>
-                      {shoppingItem.tracking_number}
-                    </div>
-                  </div>
-
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <button
+                    type="button"
                     onClick={() => handleCopyResi(shoppingItem.tracking_number)}
                     className="glass-btn"
-                    style={{ padding: '8px 12px', fontSize: '0.78rem', background: copiedResi ? '#ecfdf5' : '#fff', color: copiedResi ? '#059669' : 'var(--text-main)' }}
+                    style={{ padding: '6px 12px', fontSize: '0.78rem', background: copiedResi ? '#ecfdf5' : '#fff', color: copiedResi ? '#059669' : '#1e40af' }}
                   >
                     {copiedResi ? <Check size={14} /> : <Copy size={14} />}
-                    <span>{copiedResi ? 'Disalin!' : 'Salin Resi'}</span>
+                    <span>{copiedResi ? 'Disalin' : 'Salin Resi'}</span>
                   </button>
+
+                  <a
+                    href={shoppingItem.tracking_url || `https://cekresi.com/?noresi=${encodeURIComponent(shoppingItem.tracking_number || '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="glass-btn glass-btn-primary"
+                    style={{ padding: '6px 12px', fontSize: '0.78rem', textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={14} />
+                    <span>Cek Resi</span>
+                  </a>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Email Body Content */}
-            <div style={{
-              flex: 1,
-              background: 'rgba(255, 255, 255, 0.75)',
-              borderRadius: '16px',
-              padding: '20px',
-              overflowY: 'auto',
-              border: '1px solid rgba(0,0,0,0.04)',
-              lineHeight: 1.6
-            }}>
-              {selectedEmail.html_body ? (
-                <div 
-                  dangerouslySetInnerHTML={{ __html: selectedEmail.html_body }} 
-                  style={{ color: 'var(--text-main)' }}
-                />
-              ) : (
-                <pre style={{ fontFamily: 'var(--font-sans)', whiteSpace: 'pre-wrap', color: 'var(--text-main)' }}>
-                  {selectedEmail.text_body}
-                </pre>
-              )}
-            </div>
+          {/* Email Content Body */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '24px',
+            border: '1px solid #e2e8f0',
+            minHeight: '280px',
+            lineHeight: 1.65,
+            fontSize: '0.92rem',
+            color: '#1e293b'
+          }}>
+            {selectedEmail.html_body ? (
+              <div
+                dangerouslySetInnerHTML={{ __html: selectedEmail.html_body }}
+                style={{ overflowX: 'auto' }}
+              />
+            ) : (
+              <div style={{ whiteSpace: 'pre-wrap' }}>
+                {selectedEmail.text_body}
+              </div>
+            )}
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', textAlign: 'center' }}>
-            <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '24px',
-              background: 'linear-gradient(135deg, rgba(255, 240, 246, 0.8) 0%, rgba(240, 245, 255, 0.8) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px',
-              boxShadow: '0 8px 24px rgba(220, 180, 205, 0.2)'
-            }}>
-              <Mail size={38} color="#ff5c8a" />
-            </div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' }}>
-              Pilih Email untuk Membaca
-            </h3>
-            <p style={{ fontSize: '0.85rem', maxWidth: '320px', lineHeight: 1.5 }}>
-              Semua email belanja Shopee/Tokped/TikTok dan surat cinta akan tampil estetik di sini ✨
-            </p>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

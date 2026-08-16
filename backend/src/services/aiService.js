@@ -75,8 +75,7 @@ Kembalikan HANYA JSON valid tanpa format markdown atau penjelasan lain dengan sk
         messages: [
           { role: 'system', content: 'You are an expert AI parser for Indonesian e-commerce receipts, courier deliveries, and couple emails. Always respond with strict valid JSON only.' },
           { role: 'user', content: prompt }
-        ],
-        temperature: 0.2
+        ]
       })
     });
 

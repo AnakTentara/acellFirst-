@@ -249,6 +249,26 @@ body {
   background: rgba(147, 197, 253, 0.4);
   border-radius: 999px;
 }
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(37, 99, 235, 0.6);
 }
